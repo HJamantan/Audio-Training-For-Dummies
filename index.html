@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <style>
+<meta charset="UTF-8" />
+<title>Web EQ Trainer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
   body {
     margin: 0;
     font-family: sans-serif;
@@ -53,158 +57,99 @@
     background: #555;
   }
 </style>
-
-  <meta charset="UTF-8" />
-  <title>Audio Training For Dummeis</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
 <body>
+  <div id="app">
+    <aside id="audio-list">
+      <h3>Audio</h3>
+      <button id="load-audio">Load Demo</button>
+    </aside>
 
-  <button id="play">Play</button>
-  <button id="stop">Stop</button>
+    <main id="eq-panel">
+      <canvas id="eq-canvas" width="900" height="400"></canvas>
+    </main>
 
-  
-  <script type="module">
-    
-const canvas = document.getElementById("eq-canvas");
-const ctx = canvas.getContext("2d");
+    <aside id="fx-rack">
+      <h3>FX</h3>
+      <p>Coming soon</p>
+    </aside>
+  </div>
 
-const FREQ_MIN = 20;
-const FREQ_MAX = 20000;
-const GAIN_MIN = -24;
-const GAIN_MAX = 24;
+  <footer>
+    <button id="play">Play</button>
+    <button id="stop">Stop</button>
+  </footer>
 
-let activeBand = null;
-let isDragging = false;
+<script type="module">
+/* ======================================================
+   AUDIO ENGINE
+====================================================== */
 
-    /* Audio Engine will live here */
-// =====================
-// Audio Context
-// =====================
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-// =====================
-// Master Output
-// =====================
 const masterGain = audioContext.createGain();
-masterGain.gain.value = 1;
 masterGain.connect(audioContext.destination);
 
-// =====================
-// State
-// =====================
-let sourceNode = null;
 let audioBuffer = null;
+let sourceNode = null;
 
 const eqBands = [];
-const preFX = [];
-const postFX = [];
 
-// =====================
-// Load Audio
-// =====================
-async function loadAudio(url) {
-  const res = await fetch(url);
-  const arrayBuffer = await res.arrayBuffer();
-  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+/* ------------------------------------------------------
+   LOAD AUDIO
+------------------------------------------------------ */
+async function loadAudio() {
+  const res = await fetch("./audio/demo.wav");
+  const buf = await res.arrayBuffer();
+  audioBuffer = await audioContext.decodeAudioData(buf);
 }
 
-// =====================
-// Create Source
-// =====================
+/* ------------------------------------------------------
+   CREATE SOURCE
+------------------------------------------------------ */
 function createSource() {
-  if (!audioBuffer) return;
-
   sourceNode = audioContext.createBufferSource();
   sourceNode.buffer = audioBuffer;
   sourceNode.loop = true;
 }
 
-// =====================
-// EQ Band Factory
-// =====================
-function createEQBand({
-  type = "peaking",
-  frequency = 1000,
-  gain = 0,
-  Q = 1
-} = {}) {
+/* ------------------------------------------------------
+   EQ BAND
+------------------------------------------------------ */
+function addEQBand({ frequency = 1000, gain = 0, Q = 1, type = "peaking" } = {}) {
   const node = audioContext.createBiquadFilter();
   node.type = type;
   node.frequency.value = frequency;
   node.gain.value = gain;
   node.Q.value = Q;
 
-  return {
-    node,
-    type,
-    frequency,
-    gain,
-    Q,
-    enabled: true
-  };
-}
-
-// =====================
-// Add / Remove EQ Bands
-// =====================
-function addEQBand(options) {
-  const band = createEQBand(options);
-  eqBands.push(band);
-  rebuildGraph();
-  return band;
-}
-
-function removeEQBand(index) {
-  if (!eqBands[index]) return;
-  eqBands[index].node.disconnect();
-  eqBands.splice(index, 1);
+  eqBands.push({ node });
   rebuildGraph();
 }
 
-// =====================
-// Graph Rebuild
-// =====================
+/* ------------------------------------------------------
+   GRAPH REBUILD
+------------------------------------------------------ */
 function rebuildGraph() {
   if (!sourceNode) return;
 
-  // Disconnect everything
   sourceNode.disconnect();
   eqBands.forEach(b => b.node.disconnect());
-  preFX.forEach(fx => fx.disconnect?.());
-  postFX.forEach(fx => fx.disconnect?.());
 
   let node = sourceNode;
-
-  // Pre FX
-  preFX.forEach(fx => {
-    node.connect(fx);
-    node = fx;
-  });
-
-  // EQ Bands
-  eqBands.forEach(band => {
-    if (!band.enabled) return;
-    node.connect(band.node);
-    node = band.node;
-  });
-
-  // Post FX
-  postFX.forEach(fx => {
-    node.connect(fx);
-    node = fx;
+  eqBands.forEach(b => {
+    node.connect(b.node);
+    node = b.node;
   });
 
   node.connect(masterGain);
 }
 
-// =====================
-// Transport
-// =====================
+/* ------------------------------------------------------
+   TRANSPORT
+------------------------------------------------------ */
 function play() {
-  if (audioContext.state === "suspended") {
-    audioContext.resume();
-  }
+  if (audioContext.state === "suspended") audioContext.resume();
 
   if (sourceNode) {
     sourceNode.stop();
@@ -223,41 +168,33 @@ function stop() {
   sourceNode = null;
 }
 
-// =====================
-// Demo Controls
-// =====================
-document.getElementById("play").onclick = async () => {
-  if (!audioBuffer) {
-    await loadAudio("./audio/demo.wav"); // put a file here
-    addEQBand({ frequency: 1000, gain: 6 });
-    addEQBand({ frequency: 300, gain: -4, Q: 1.2 });
-  }
-  play();
-  
-  document.querySelectorAll("[data-audio]").forEach(btn => {
-  btn.onclick = async () => {
-    await loadAudio(btn.dataset.audio);
-    play();
-  };
-    // =====================
-// EQ Math Helpers
-// =====================
+/* ======================================================
+   EQ CANVAS
+====================================================== */
+
+const canvas = document.getElementById("eq-canvas");
+const ctx = canvas.getContext("2d");
+
+const FREQ_MIN = 20;
+const FREQ_MAX = 20000;
+const GAIN_MIN = -24;
+const GAIN_MAX = 24;
+
+let activeBand = null;
+let dragging = false;
+
+/* ------------------------------------------------------
+   MATH HELPERS
+------------------------------------------------------ */
 function freqToX(freq) {
-  const minLog = Math.log10(FREQ_MIN);
-  const maxLog = Math.log10(FREQ_MAX);
   return (
-    (Math.log10(freq) - minLog) /
-    (maxLog - minLog)
+    Math.log10(freq / FREQ_MIN) /
+    Math.log10(FREQ_MAX / FREQ_MIN)
   ) * canvas.width;
 }
 
 function xToFreq(x) {
-  const minLog = Math.log10(FREQ_MIN);
-  const maxLog = Math.log10(FREQ_MAX);
-  return Math.pow(
-    10,
-    minLog + (x / canvas.width) * (maxLog - minLog)
-  );
+  return FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width);
 }
 
 function gainToY(gain) {
@@ -268,13 +205,12 @@ function yToGain(y) {
   return ((canvas.height / 2 - y) / canvas.height) * (GAIN_MAX - GAIN_MIN);
 }
 
-// =====================
-// EQ Drawing
-// =====================
+/* ------------------------------------------------------
+   DRAWING
+------------------------------------------------------ */
 function drawGrid() {
   ctx.strokeStyle = "#333";
-  const freqs = [20,50,100,200,500,1000,2000,5000,10000,20000];
-  freqs.forEach(f => {
+  [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
     const x = freqToX(f);
     ctx.beginPath();
     ctx.moveTo(x, 0);
@@ -290,9 +226,9 @@ function drawGrid() {
 }
 
 function drawBands() {
-  eqBands.forEach(band => {
-    const x = freqToX(band.node.frequency.value);
-    const y = gainToY(band.node.gain.value);
+  eqBands.forEach(b => {
+    const x = freqToX(b.node.frequency.value);
+    const y = gainToY(b.node.gain.value);
 
     ctx.beginPath();
     ctx.arc(x, y, 6, 0, Math.PI * 2);
@@ -311,71 +247,61 @@ function drawEQ() {
 
   requestAnimationFrame(drawEQ);
 }
-// =====================
-// EQ Interaction
-// =====================
-function getBandAtPosition(x, y) {
-  return eqBands.find(band => {
-    const bx = freqToX(band.node.frequency.value);
-    const by = gainToY(band.node.gain.value);
+
+/* ------------------------------------------------------
+   INTERACTION
+------------------------------------------------------ */
+function getBandAt(x, y) {
+  return eqBands.find(b => {
+    const bx = freqToX(b.node.frequency.value);
+    const by = gainToY(b.node.gain.value);
     return Math.hypot(bx - x, by - y) < 8;
   });
 }
 
 canvas.addEventListener("mousedown", e => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  activeBand = getBandAtPosition(x, y);
-  isDragging = !!activeBand;
+  const r = canvas.getBoundingClientRect();
+  activeBand = getBandAt(e.clientX - r.left, e.clientY - r.top);
+  dragging = !!activeBand;
 });
 
 canvas.addEventListener("mousemove", e => {
-  if (!isDragging || !activeBand) return;
+  if (!dragging || !activeBand) return;
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
 
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  activeBand.node.frequency.value = Math.min(
-    FREQ_MAX,
-    Math.max(FREQ_MIN, xToFreq(x))
-  );
-
-  activeBand.node.gain.value = Math.min(
-    GAIN_MAX,
-    Math.max(GAIN_MIN, yToGain(y))
-  );
+  activeBand.node.frequency.value = Math.min(FREQ_MAX, Math.max(FREQ_MIN, xToFreq(x)));
+  activeBand.node.gain.value = Math.min(GAIN_MAX, Math.max(GAIN_MIN, yToGain(y)));
 });
 
 canvas.addEventListener("mouseup", () => {
-  isDragging = false;
+  dragging = false;
   activeBand = null;
 });
 
 canvas.addEventListener("wheel", e => {
   if (!activeBand) return;
   e.preventDefault();
-
-  activeBand.node.Q.value = Math.max(
-    0.1,
-    Math.min(18, activeBand.node.Q.value + e.deltaY * -0.01)
-  );
-});
-    
-addEQBand({ frequency: 1000, gain: 6 });
-
-drawEQ();
-
+  activeBand.node.Q.value = Math.max(0.1, Math.min(18, activeBand.node.Q.value + e.deltaY * -0.01));
 });
 
+/* ======================================================
+   INIT
+====================================================== */
+
+document.getElementById("load-audio").onclick = async () => {
+  await loadAudio();
+  addEQBand({ frequency: 1000, gain: 6 });
+  addEQBand({ frequency: 300, gain: -6 });
 };
 
+document.getElementById("play").onclick = play;
 document.getElementById("stop").onclick = stop;
 
-  </script>
-
+drawEQ();
+</script>
+  
 <body>
   <div id="app">
     <aside id="audio-list">
