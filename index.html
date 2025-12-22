@@ -243,10 +243,37 @@ function drawEQ() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   drawGrid();
+
+  // Draw frequency spectrum analyzer bars
+  analyser.getByteFrequencyData(dataArray);
+
+  ctx.fillStyle = "#4caf50";
+  const barWidth = canvas.width / bufferLength;
+  for(let i = 0; i < bufferLength; i++) {
+    const barHeight = (dataArray[i] / 255) * canvas.height;
+    const x = i * barWidth;
+    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+  }
+
+  // Draw EQ response curve
+  ctx.beginPath();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#ff4081";
+  for (let x = 0; x < canvas.width; x++) {
+    const freq = xToFreq(x);
+    const mag = getCombinedEQResponse(freq);
+    const gainDb = 20 * Math.log10(mag);
+    const y = gainToY(gainDb);
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
   drawBands();
 
   requestAnimationFrame(drawEQ);
 }
+
 
 /* ------------------------------------------------------
    INTERACTION
