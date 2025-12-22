@@ -1,8 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>
+  body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #1e1e1e;
+    color: #eee;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    height: calc(100vh - 60px);
+  }
+
+  aside, main {
+    padding: 10px;
+    border-right: 1px solid #333;
+  }
+
+  #eq-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  canvas {
+    background: #111;
+    border: 1px solid #444;
+  }
+
+  footer {
+    height: 60px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #111;
+    border-top: 1px solid #333;
+  }
+
+  button {
+    background: #333;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #555;
+  }
+</style>
+
   <meta charset="UTF-8" />
-  <title>Web EQ Trainer</title>
+  <title>Audio Training For Dummeis</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
@@ -167,11 +220,44 @@ document.getElementById("play").onclick = async () => {
     addEQBand({ frequency: 300, gain: -4, Q: 1.2 });
   }
   play();
+  
+  document.querySelectorAll("[data-audio]").forEach(btn => {
+  btn.onclick = async () => {
+    await loadAudio(btn.dataset.audio);
+    play();
+  };
+});
+
 };
 
 document.getElementById("stop").onclick = stop;
 
   </script>
 
+<body>
+  <div id="app">
+    <aside id="audio-list">
+      <h3>Audio Files</h3>
+      <button data-audio="./audio/demo.wav">Demo Track</button>
+    </aside>
+
+    <main id="eq-panel">
+      <canvas id="eq-canvas" width="800" height="400"></canvas>
+    </main>
+
+    <aside id="fx-rack">
+      <h3>FX</h3>
+      <p>Coming soon</p>
+    </aside>
+  </div>
+
+  <footer>
+    <button id="play">Play</button>
+    <button id="stop">Stop</button>
+  </footer>
+
+  <script type="module">
+    /* audio engine stays here */
+  </script>
 </body>
 </html>
