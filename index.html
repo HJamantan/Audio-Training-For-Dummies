@@ -94,6 +94,25 @@ let audioBuffer = null;
 let sourceNode = null;
 
 const eqBands = [];
+const analyser = audioContext.createAnalyser();
+analyser.fftSize = 2048;
+const bufferLength = analyser.frequencyBinCount;
+const dataArray = new Uint8Array(bufferLength);
+
+function getCombinedEQResponse(f) {
+  let mag = 1;
+
+  eqBands.forEach(band => {
+    const freqArray = new Float32Array([f]);
+    const magResponse = new Float32Array(1);
+    const phaseResponse = new Float32Array(1);
+    band.node.getFrequencyResponse(freqArray, magResponse, phaseResponse);
+
+    mag *= magResponse[0];
+  });
+
+  return mag;
+}
 
 /* ------------------------------------------------------
    LOAD AUDIO
@@ -124,7 +143,22 @@ function addEQBand({ frequency = 1000, gain = 0, Q = 1, type = "peaking" } = {})
   node.Q.value = Q;
 
   eqBands.push({ node });
-  rebuildGraph();
+  function rebuildGraph() {
+  if (!sourceNode) return;
+
+  sourceNode.disconnect();
+  eqBands.forEach(b => b.node.disconnect());
+
+  let node = sourceNode;
+  eqBands.forEach(b => {
+    node.connect(b.node);
+    node = b.node;
+  });
+
+  node.connect(analyser);
+  analyser.connect(masterGain);
+}
+
 }
 
 /* ------------------------------------------------------
