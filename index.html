@@ -363,6 +363,9 @@ canvas.addEventListener("wheel", e => {
     Math.min(18, activeBand.node.Q.value + e.deltaY * -0.01)
   );
 });
+    
+addEQBand({ frequency: 1000, gain: 6 });
+
 drawEQ();
 
 });
