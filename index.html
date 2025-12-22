@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Web EQ Trainer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+  <button id="play">Play</button>
+  <button id="stop">Stop</button>
+
+  <script type="module">
+    /* Audio Engine will live here */
+    // =====================
+// Audio Context
+// =====================
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+// =====================
+// Master Output
+// =====================
+const masterGain = audioContext.createGain();
+masterGain.gain.value = 1;
+masterGain.connect(audioContext.destination);
+
+// =====================
+// State
+// =====================
+let sourceNode = null;
+let audioBuffer = null;
+
+const eqBands = [];
+const preFX = [];
+const postFX = [];
+
+// =====================
+// Load Audio
+// =====================
+async function loadAudio(url) {
+  const res = await fetch(url);
+  const arrayBuffer = await res.arrayBuffer();
+  audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+}
+
+// =====================
+// Create Source
+// =====================
+function createSource() {
+  if (!audioBuffer) return;
+
+  sourceNode = audioContext.createBufferSource();
+  sourceNode.buffer = audioBuffer;
+  sourceNode.loop = true;
+}
+
+// =====================
+// EQ Band Factory
+// =====================
+function createEQBand({
+  type = "peaking",
+  frequency = 1000,
+  gain = 0,
+  Q = 1
+} = {}) {
+  const node = audioContext.createBiquadFilter();
+  node.type = type;
+  node.frequency.value = frequency;
+  node.gain.value = gain;
+  node.Q.value = Q;
+
+  return {
+    node,
+    type,
+    frequency,
+    gain,
+    Q,
+    enabled: true
+  };
+}
+
+// =====================
+// Add / Remove EQ Bands
+// =====================
+function addEQBand(options) {
+  const band = createEQBand(options);
+  eqBands.push(band);
+  rebuildGraph();
+  return band;
+}
+
+function removeEQBand(index) {
+  if (!eqBands[index]) return;
+  eqBands[index].node.disconnect();
+  eqBands.splice(index, 1);
+  rebuildGraph();
+}
+
+// =====================
+// Graph Rebuild
+// =====================
+function rebuildGraph() {
+  if (!sourceNode) return;
+
+  // Disconnect everything
+  sourceNode.disconnect();
+  eqBands.forEach(b => b.node.disconnect());
+  preFX.forEach(fx => fx.disconnect?.());
+  postFX.forEach(fx => fx.disconnect?.());
+
+  let node = sourceNode;
+
+  // Pre FX
+  preFX.forEach(fx => {
+    node.connect(fx);
+    node = fx;
+  });
+
+  // EQ Bands
+  eqBands.forEach(band => {
+    if (!band.enabled) return;
+    node.connect(band.node);
+    node = band.node;
+  });
+
+  // Post FX
+  postFX.forEach(fx => {
+    node.connect(fx);
+    node = fx;
+  });
+
+  node.connect(masterGain);
+}
+
+// =====================
+// Transport
+// =====================
+function play() {
+  if (audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+
+  if (sourceNode) {
+    sourceNode.stop();
+    sourceNode.disconnect();
+  }
+
+  createSource();
+  rebuildGraph();
+  sourceNode.start();
+}
+
+function stop() {
+  if (!sourceNode) return;
+  sourceNode.stop();
+  sourceNode.disconnect();
+  sourceNode = null;
+}
+
+// =====================
+// Demo Controls
+// =====================
+document.getElementById("play").onclick = async () => {
+  if (!audioBuffer) {
+    await loadAudio("./audio/demo.wav"); // put a file here
+    addEQBand({ frequency: 1000, gain: 6 });
+    addEQBand({ frequency: 300, gain: -4, Q: 1.2 });
+  }
+  play();
+};
+
+document.getElementById("stop").onclick = stop;
+
+  </script>
+
+</body>
+</html>
