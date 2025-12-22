@@ -87,14 +87,15 @@
       <button id="load-audio">Load Demo</button>
     </aside>
 
-    <main id="eq-panel">
-      <canvas id="eq-canvas" width="900" height="400"></canvas>
+    <main id="eq-panel" style="display: flex; flex-direction: column; align-items: center;">
+  <canvas id="eq-canvas" width="900" height="400"></canvas>
+  <button id="add-band" style="margin-top: 12px; padding: 6px 12px;">Add Band</button>
     </main>
+
 
     <aside id="fx-rack">
       <h3>EQ Bands</h3>
       <div id="bands-list"></div>
-      <button id="add-band">Add Band</button>
     </aside>
   </div>
 
@@ -238,9 +239,12 @@ function xToFreq(x) {
 }
 
 function gainToY(gain) {
-  // Map gain dB to canvas y (invert y axis)
-  const ratio = (gain - GAIN_MIN) / (GAIN_MAX - GAIN_MIN);
+  // Clamp gain dB within min/max so it's visible on canvas
+  const clampedGain = Math.min(GAIN_MAX, Math.max(GAIN_MIN, gain));
+  const ratio = (clampedGain - GAIN_MIN) / (GAIN_MAX - GAIN_MIN);
   return canvas.height - ratio * canvas.height;
+}
+
 }
 
 function yToGain(y) {
