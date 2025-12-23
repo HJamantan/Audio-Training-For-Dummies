@@ -255,7 +255,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedBand = null;
   let draggingBand = null;
 
-  // Audio source + nodes per track
   class Track {
     constructor(name) {
       this.name = name;
@@ -270,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
       this.eqInput = audioContext.createGain();
       this.eqOutput = audioContext.createGain();
 
-      // Dynamics processors slots
       this.dynamics = [
         { position: "pre", type: "bypass", node: createBypassNode() },
         { position: "post", type: "bypass", node: createBypassNode() }
@@ -285,23 +283,35 @@ document.addEventListener("DOMContentLoaded", () => {
       if (this.sourceNode) {
         this.sourceNode.disconnect();
       }
-      if (this.eqInput) {
-        this.eqInput.disconnect();
-      }
-      if (this.eqOutput) {
-        this.eqOutput.disconnect();
-      }
-      if (this.gainNode) {
-        this.gainNode.disconnect();
-      }
+      this.eqBands.forEach(band => band.node && band.node.disconnect());
+
       this.dynamics.forEach(dyn => dyn.node.disconnect());
+      this.eqInput.disconnect();
+      this.eqOutput.disconnect();
+      this.gainNode.disconnect();
 
       if (this.sourceNode) {
         this.sourceNode.connect(this.dynamics[0].node);
         this.dynamics[0].node.connect(this.eqInput);
       }
 
-      rebuildEQ(this);
+      // Rebuild EQ chain
+      if (this.eqBands.length === 0) {
+        this.eqInput.connect(this.eqOutput);
+      } else {
+        let prevNode = this.eqInput;
+        this.eqBands.forEach(band => {
+          band.node.type = band.type === "lpf" ? "lowpass" :
+                          band.type === "hpf" ? "highpass" :
+                          band.type;
+          band.node.frequency.value = band.freq;
+          band.node.gain.value = band.gain;
+          band.node.Q.value = band.Q;
+          prevNode.connect(band.node);
+          prevNode = band.node;
+        });
+        prevNode.connect(this.eqOutput);
+      }
 
       this.eqOutput.connect(this.dynamics[1].node);
       this.dynamics[1].node.connect(this.gainNode);
@@ -333,7 +343,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Audio Node creators for dynamics
   function createBypassNode() {
     return audioContext.createGain();
   }
@@ -352,8 +361,19 @@ document.addEventListener("DOMContentLoaded", () => {
   function createLimiterNode() {
     return audioContext.createGain();
   }
+  function createDynNode(type) {
+    switch(type) {
+      case "compressor": return createCompressorNode();
+      case "gate": return createGateNode();
+      case "deesser": return createDeEsserNode();
+      case "expander": return createExpanderNode();
+      case "limiter": return createLimiterNode();
+      case "bypass":
+      default:
+        return createBypassNode();
+    }
+  }
 
-  // Load audio files
   async function loadTracks() {
     tracks = [];
     trackListEl.querySelectorAll(".track").forEach(t => t.remove());
@@ -418,6 +438,9 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDynamicsUI();
         drawEQ();
         playBtn.disabled = false;
+        deleteBandBtn.disabled = true;
+        addBandBtn.disabled = false;
+        bandTypeSelect.disabled = true;
       };
 
       trackListEl.appendChild(trackEl);
@@ -477,29 +500,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return GAIN_MIN + norm * (GAIN_MAX - GAIN_MIN);
   }
 
-  function rebuildEQ(track) {
-    track.eqBands.forEach(band => band.node.disconnect());
-
-    if (track.eqBands.length === 0) {
-      track.eqInput.connect(track.eqOutput);
-      return;
-    }
-
-    let prevNode = track.eqInput;
-    track.eqBands.forEach(band => {
-      band.node.type = band.type === "lpf" ? "lowpass" :
-                      band.type === "hpf" ? "highpass" :
-                      band.type;
-      band.node.frequency.value = band.freq;
-      band.node.gain.value = band.gain;
-      band.node.Q.value = band.Q;
-      prevNode.connect(band.node);
-      prevNode = band.node;
-    });
-
-    prevNode.connect(track.eqOutput);
-  }
-
   function drawEQ() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -532,6 +532,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!selectedTrack) return;
 
+    // Frequency response placeholder (for bell filters only)
     const eqResponse = new Float32Array(canvas.width);
     for (let i = 0; i < canvas.width; i++) {
       const freq = xToFreq(i);
@@ -544,33 +545,36 @@ document.addEventListener("DOMContentLoaded", () => {
         const gain = band.gain;
 
         const bw = f0 / Q;
-        const diff = Math.abs(freq - f0);
-        const influence = Math.exp(-Math.pow(diff / bw, 2));
-        mag *= Math.pow(10, (gain * influence) / 40);
+        const deltaF = Math.abs(freq - f0);
+        const x = deltaF / bw;
+        const peak = Math.pow(10, gain / 40);
+        mag *= 1 + (peak - 1) * Math.exp(-x*x*4);
       });
 
       eqResponse[i] = mag;
     }
 
-    ctx.strokeStyle = "#0f0";
-    ctx.lineWidth = 2;
+    // Draw frequency response
     ctx.beginPath();
+    ctx.strokeStyle = "#0f0";
     for (let i = 0; i < canvas.width; i++) {
-      const magDb = 20 * Math.log10(eqResponse[i]);
-      const y = gainToY(magDb);
+      const mag = eqResponse[i];
+      const y = gainToY(20 * Math.log10(mag));
       if (i === 0) ctx.moveTo(i, y);
       else ctx.lineTo(i, y);
     }
     ctx.stroke();
 
-    ctx.fillStyle = "#0f0";
+    // Draw EQ bands
     selectedTrack.eqBands.forEach((band, i) => {
       const x = freqToX(band.freq);
       const y = gainToY(band.gain);
+
+      ctx.fillStyle = (i === selectedBand) ? "#ff0" : "#0f0";
       ctx.beginPath();
       ctx.arc(x, y, 7, 0, Math.PI * 2);
       ctx.fill();
-      if (selectedBand === i) {
+      if (i === selectedBand) {
         ctx.strokeStyle = "#ff0";
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -669,6 +673,21 @@ document.addEventListener("DOMContentLoaded", () => {
     bandTypeSelect.value = band.type;
   }
 
+  function rebuildEQ(track) {
+    track.eqBands.forEach(band => {
+      if (!band.node) {
+        band.node = audioContext.createBiquadFilter();
+      }
+      band.node.type = band.type === "lpf" ? "lowpass" :
+                      band.type === "hpf" ? "highpass" :
+                      band.type;
+      band.node.frequency.value = band.freq;
+      band.node.gain.value = band.gain;
+      band.node.Q.value = band.Q;
+    });
+    track.updateAudioGraph();
+  }
+
   playBtn.onclick = () => {
     if (!selectedTrack) return;
     selectedTrack.play();
@@ -683,38 +702,28 @@ document.addEventListener("DOMContentLoaded", () => {
     stopBtn.disabled = true;
   };
 
-  // Dynamics nodes creation (mostly bypass for now)
-  function createBypassNode() {
-    return audioContext.createGain();
-  }
-  function createCompressorNode() {
-    return audioContext.createDynamicsCompressor();
-  }
-  function createGateNode() {
-    return audioContext.createGain();
-  }
-  function createDeEsserNode() {
-    return audioContext.createGain();
-  }
-  function createExpanderNode() {
-    return audioContext.createGain();
-  }
-  function createLimiterNode() {
-    return audioContext.createGain();
-  }
+  dynBoxes.forEach((box, idx) => {
+    const posSelect = box.querySelector(".dyn-position");
+    const typeSelect = box.querySelector(".dyn-type");
 
-  function createDynNode(type) {
-    switch(type) {
-      case "compressor": return createCompressorNode();
-      case "gate": return createGateNode();
-      case "deesser": return createDeEsserNode();
-      case "expander": return createExpanderNode();
-      case "limiter": return createLimiterNode();
-      case "bypass":
-      default:
-        return createBypassNode();
-    }
-  }
+    posSelect.onchange = () => {
+      if (!selectedTrack) return;
+      selectedTrack.dynamics[idx].position = posSelect.value;
+      selectedTrack.updateAudioGraph();
+    };
+
+    typeSelect.onchange = () => {
+      if (!selectedTrack) return;
+      const newType = typeSelect.value;
+      selectedTrack.dynamics[idx].type = newType;
+
+      selectedTrack.dynamics[idx].node.disconnect();
+      selectedTrack.dynamics[idx].node = createDynNode(newType);
+
+      selectedTrack.updateAudioGraph();
+      renderDynControls(selectedTrack, idx);
+    };
+  });
 
   function renderDynControls(track, dynIdx) {
     const dyn = track.dynamics[dynIdx];
@@ -771,7 +780,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }));
       container.appendChild(createSlider("Makeup Gain (dB)", 0, 24, 0.1, dyn.makeup ?? 0, " dB", v => {
         dyn.makeup = v;
-        if (dyn.node.makeupGainNode) dyn.node.makeupGainNode.gain.value = Math.pow(10, v / 20);
+        // No native makeup gain in DynamicsCompressorNode, would require GainNode
       }));
     } else if (dyn.type === "gate") {
       container.appendChild(createSlider("Threshold (dB)", -100, 0, 1, dyn.threshold ?? -40, " dB", v => {
@@ -803,32 +812,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  dynBoxes.forEach((box, idx) => {
-    const posSelect = box.querySelector(".dyn-position");
-    const typeSelect = box.querySelector(".dyn-type");
-
-    posSelect.onchange = () => {
-      if (!selectedTrack) return;
-      selectedTrack.dynamics[idx].position = posSelect.value;
-      selectedTrack.updateAudioGraph();
-    };
-
-    typeSelect.onchange = () => {
-      if (!selectedTrack) return;
-      const newType = typeSelect.value;
-      selectedTrack.dynamics[idx].type = newType;
-
-      selectedTrack.dynamics[idx].node.disconnect();
-      selectedTrack.dynamics[idx].node = createDynNode(newType);
-
-      selectedTrack.updateAudioGraph();
-      renderDynControls(selectedTrack, idx);
-    };
-  });
-
   function setSelectedTrackUI() {
     [...trackListEl.querySelectorAll(".track")].forEach(div => {
-      div.classList.toggle("active", div.textContent.includes(selectedTrack.name));
+      div.classList.toggle("active", div.textContent === selectedTrack.name);
     });
     selectedBand = null;
     updateBandUI();
