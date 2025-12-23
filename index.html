@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Interactive Web EQ Trainer with Q Control</title>
+<title>Interactive Web EQ Trainer with Band Type Selector</title>
 
 <style>
 body {
@@ -87,10 +87,40 @@ canvas.band-dragging {
   cursor: grabbing;
 }
 
-#add-band {
+#controls {
   margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  background: #333;
+  color: #ddd;
+  border: none;
   padding: 8px 12px;
   font-size: 16px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Band type selector container */
+#band-type-container {
+  margin-top: 10px;
+  color: #ddd;
+  font-size: 14px;
+}
+
+#band-type-select {
+  background: #222;
+  color: #ddd;
+  border: 1px solid #444;
+  padding: 4px 6px;
+  font-size: 14px;
+  margin-left: 6px;
   cursor: pointer;
 }
 
@@ -102,14 +132,6 @@ canvas.band-dragging {
 
 #transport {
   margin-bottom: 10px;
-}
-
-button {
-  background: #333;
-  color: #ddd;
-  border: none;
-  padding: 6px 10px;
-  cursor: pointer;
 }
 </style>
 </head>
@@ -130,7 +152,22 @@ button {
   <!-- EQ -->
   <main id="eq-panel">
     <canvas id="eq" width="900" height="400"></canvas>
-    <button id="add-band">Add EQ Band</button>
+    <div id="controls">
+      <button id="add-band">Add EQ Band</button>
+      <button id="delete-band" disabled>Delete Selected Band</button>
+    </div>
+    <div id="band-type-container">
+      <label for="band-type-select">Band Type:</label>
+      <select id="band-type-select" disabled>
+        <option value="peaking">Bell (Peaking)</option>
+        <option value="lowshelf">Low Shelf</option>
+        <option value="highshelf">High Shelf</option>
+        <option value="lowpass">Low Pass</option>
+        <option value="highpass">High Pass</option>
+        <option value="notch">Notch</option>
+        <option value="allpass">All Pass</option>
+      </select>
+    </div>
   </main>
 
   <!-- FX RACK -->
@@ -206,6 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     buildTrackUI();
     selectedTrack = tracks[0];
+    setSelectedBand(null);
   }
 
   /* =======================
@@ -225,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
         row.classList.add("active");
         selectedTrack = track;
+        setSelectedBand(null);
       };
 
       const controls = document.createElement("div");
@@ -314,7 +353,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const GAIN_MAX = 24;
 
   let draggingBand = null;
-  const BAND_RADIUS = 8;
+  let selectedBand = null;
+  let lastMousePos = null;
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let hoveredBandAtDraw = null;
 
   function freqToX(freq) {
     return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
@@ -353,6 +397,12 @@ document.addEventListener("DOMContentLoaded", () => {
     last.connect(track.eqOutput);
   }
 
+  function setSelectedBand(band) {
+    selectedBand = band;
+    updateDeleteButton();
+    updateBandTypeSelect();
+  }
+
   document.getElementById("add-band").onclick = () => {
     if (!selectedTrack) return;
 
@@ -362,16 +412,52 @@ document.addEventListener("DOMContentLoaded", () => {
     node.gain.value = 0;
     node.Q.value = 1;
 
-    selectedTrack.eqBands.push({
+    const newBand = {
       node,
       frequency: 1000,
       gain: 0,
       Q: 1,
       type: "peaking"
-    });
+    };
 
+    selectedTrack.eqBands.push(newBand);
+    setSelectedBand(newBand);
     rebuildEQ(selectedTrack);
   };
+
+  document.getElementById("delete-band").onclick = () => {
+    if (!selectedTrack || !selectedBand) return;
+    const idx = selectedTrack.eqBands.indexOf(selectedBand);
+    if (idx !== -1) {
+      selectedBand.node.disconnect();
+      selectedTrack.eqBands.splice(idx, 1);
+      setSelectedBand(null);
+      rebuildEQ(selectedTrack);
+    }
+  };
+
+  function updateDeleteButton() {
+    const btn = document.getElementById("delete-band");
+    btn.disabled = !selectedBand;
+  }
+
+  const bandTypeSelect = document.getElementById("band-type-select");
+
+  bandTypeSelect.onchange = () => {
+    if (!selectedTrack || !selectedBand) return;
+    selectedBand.type = bandTypeSelect.value;
+    selectedBand.node.type = bandTypeSelect.value;
+    rebuildEQ(selectedTrack);
+  };
+
+  function updateBandTypeSelect() {
+    if (selectedBand) {
+      bandTypeSelect.disabled = false;
+      bandTypeSelect.value = selectedBand.type;
+    } else {
+      bandTypeSelect.disabled = true;
+    }
+  }
 
   /* =======================
      DRAWING & INTERACTIVITY
@@ -438,23 +524,23 @@ document.addEventListener("DOMContentLoaded", () => {
       const y = gainToY(band.gain);
 
       ctx.beginPath();
-      ctx.fillStyle = (band === draggingBand) ? "#ff0" : "#0f0";
+      ctx.fillStyle = (band === draggingBand) ? "#ff0" : (band === selectedBand ? "#0ff" : "#0f0");
       ctx.strokeStyle = "#090";
       ctx.lineWidth = 2;
-      ctx.arc(x, y, BAND_RADIUS, 0, Math.PI * 2);
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
       // Draw Q value as small text near band
       ctx.fillStyle = "#0f0";
       ctx.font = "10px sans-serif";
-      ctx.fillText("Q:" + band.Q.toFixed(2), x + BAND_RADIUS + 4, y - BAND_RADIUS - 4);
+      ctx.fillText("Q:" + band.Q.toFixed(2), x + 12, y - 12);
 
       // Check if mouse is near band to change cursor (for UX)
       if (lastMousePos) {
         const dx = lastMousePos.x - x;
         const dy = lastMousePos.y - y;
-        if (dx * dx + dy * dy <= BAND_RADIUS * BAND_RADIUS) {
+        if (dx * dx + dy * dy <= 64) { // 8*8 radius squared
           hoveredBand = band;
         }
       }
@@ -469,13 +555,6 @@ document.addEventListener("DOMContentLoaded", () => {
      INTERACTION
   ======================= */
 
-  let isDragging = false;
-  let draggingBand = null;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  let lastMousePos = null;
-  let hoveredBandAtDraw = null;
-
   function findBandAtPos(x, y) {
     if (!selectedTrack) return null;
     return selectedTrack.eqBands.find(b => {
@@ -483,7 +562,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const by = gainToY(b.gain);
       const dx = x - bx;
       const dy = y - by;
-      return dx * dx + dy * dy <= BAND_RADIUS * BAND_RADIUS;
+      return dx * dx + dy * dy <= 64;
     }) || null;
   }
 
@@ -495,10 +574,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const band = findBandAtPos(mx, my);
     if (band) {
       draggingBand = band;
+      setSelectedBand(band);
       isDragging = true;
       dragOffsetX = mx - freqToX(band.frequency);
       dragOffsetY = my - gainToY(band.gain);
       e.preventDefault();
+    } else {
+      setSelectedBand(null);
     }
   });
 
@@ -552,12 +634,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Clamp Q between 0.1 and 18 (typical practical range)
     hoveredBandAtDraw.Q = Math.min(Math.max(hoveredBandAtDraw.Q, 0.1), 18);
-    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
 
+    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
     rebuildEQ(selectedTrack);
   }, { passive: false });
 
-  // Right click to remove band
+  // Right click deletes band
   canvas.addEventListener("contextmenu", e => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
@@ -569,6 +651,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (idx !== -1) {
         band.node.disconnect();
         selectedTrack.eqBands.splice(idx, 1);
+        if (band === selectedBand) setSelectedBand(null);
         rebuildEQ(selectedTrack);
       }
     }
@@ -578,5 +661,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
+
 </body>
 </html>
