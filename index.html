@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Interactive Web EQ Trainer</title>
+<title>Interactive Web EQ Trainer with Q Control</title>
 
 <style>
 body {
@@ -77,6 +77,14 @@ canvas {
   background: #000;
   border: 1px solid #333;
   cursor: crosshair;
+}
+
+canvas.band-hover {
+  cursor: grab;
+}
+
+canvas.band-dragging {
+  cursor: grabbing;
 }
 
 #add-band {
@@ -401,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!selectedTrack) return;
 
-    // Draw frequency response curve
+    // Draw frequency response curve of selected track only
     ctx.strokeStyle = "#0f0";
     ctx.beginPath();
 
@@ -424,7 +432,8 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.stroke();
 
     // Draw EQ bands as draggable circles
-    selectedTrack.eqBands.forEach((band, i) => {
+    let hoveredBand = null;
+    selectedTrack.eqBands.forEach(band => {
       const x = freqToX(band.frequency);
       const y = gainToY(band.gain);
 
@@ -440,10 +449,33 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillStyle = "#0f0";
       ctx.font = "10px sans-serif";
       ctx.fillText("Q:" + band.Q.toFixed(2), x + BAND_RADIUS + 4, y - BAND_RADIUS - 4);
+
+      // Check if mouse is near band to change cursor (for UX)
+      if (lastMousePos) {
+        const dx = lastMousePos.x - x;
+        const dy = lastMousePos.y - y;
+        if (dx * dx + dy * dy <= BAND_RADIUS * BAND_RADIUS) {
+          hoveredBand = band;
+        }
+      }
     });
+
+    canvas.classList.toggle("band-hover", hoveredBand !== null && !isDragging);
+    canvas.classList.toggle("band-dragging", isDragging);
+    hoveredBandAtDraw = hoveredBand; // save for wheel event
   }
 
-  // Find band under mouse
+  /* =======================
+     INTERACTION
+  ======================= */
+
+  let isDragging = false;
+  let draggingBand = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let lastMousePos = null;
+  let hoveredBandAtDraw = null;
+
   function findBandAtPos(x, y) {
     if (!selectedTrack) return null;
     return selectedTrack.eqBands.find(b => {
@@ -454,11 +486,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return dx * dx + dy * dy <= BAND_RADIUS * BAND_RADIUS;
     }) || null;
   }
-
-  // Mouse state for dragging
-  let isDragging = false;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
 
   canvas.addEventListener("mousedown", e => {
     const rect = canvas.getBoundingClientRect();
@@ -491,7 +518,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   canvas.addEventListener("mousemove", e => {
+    lastMousePos = (() => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    })();
+
     if (!isDragging || !draggingBand) return;
+
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left - dragOffsetX;
     const my = e.clientY - rect.top - dragOffsetY;
@@ -504,6 +540,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     rebuildEQ(selectedTrack);
   });
+
+  // Mouse wheel changes Q when hovering over band
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    if (!hoveredBandAtDraw) return;
+
+    const delta = e.deltaY || e.detail || e.wheelDelta;
+    const step = 0.1;
+    hoveredBandAtDraw.Q += (delta > 0 ? -step : step);
+
+    // Clamp Q between 0.1 and 18 (typical practical range)
+    hoveredBandAtDraw.Q = Math.min(Math.max(hoveredBandAtDraw.Q, 0.1), 18);
+    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
+
+    rebuildEQ(selectedTrack);
+  }, { passive: false });
 
   // Right click to remove band
   canvas.addEventListener("contextmenu", e => {
