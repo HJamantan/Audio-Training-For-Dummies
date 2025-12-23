@@ -80,6 +80,9 @@ canvas {
 
 #add-band {
   margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 16px;
+  cursor: pointer;
 }
 
 /* FX RACK */
@@ -301,34 +304,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const GAIN_MIN = -24;
   const GAIN_MAX = 24;
 
-  // TEMPORARY DEBUG: Verify the Add Band button click fires!
   document.getElementById("add-band").onclick = () => {
-    console.log("ADD BAND CLICKED");
     if (!selectedTrack) return;
 
     const node = audioContext.createBiquadFilter();
     node.type = "peaking";
     node.frequency.value = 1000;
-    node.gain.value = 0;
+    node.gain.value = 2;  // Boost 12dB so it's visible on graph by default
     node.Q.value = 1;
 
     selectedTrack.eqBands.push({
       node,
       frequency: 1000,
-      gain: 0,
+      gain: 12,
       Q: 1,
       type: "peaking"
     });
 
     rebuildEQ(selectedTrack);
-    console.log("Band added, total bands:", selectedTrack.eqBands.length);
   };
 
   function rebuildEQ(track) {
-    track.eqInput.disconnect();
-
+    try { track.eqInput.disconnect(); } catch(e) {}
     track.eqBands.forEach(b => {
-      b.node.disconnect();
+      try { b.node.disconnect(); } catch(e) {}
       b.node.frequency.value = b.frequency;
       b.node.gain.value = b.gain;
       b.node.Q.value = b.Q;
@@ -385,7 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.clearRect(0,0,canvas.width,canvas.height);
     drawGrid();
 
-    if (!selectedTrack) return;
+    if (!selectedTrack || selectedTrack.eqBands.length === 0) return;
 
     ctx.strokeStyle = "#0f0";
     ctx.beginPath();
