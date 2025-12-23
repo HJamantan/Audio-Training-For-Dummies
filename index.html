@@ -1,129 +1,92 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Web Multitrack EQ Trainer</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<title>Web EQ Trainer</title>
 
 <style>
 body {
   margin: 0;
   font-family: sans-serif;
-  background: #1e1e1e;
-  color: #eee;
+  background: #111;
+  color: #ddd;
 }
 
 #app {
   display: grid;
-  grid-template-columns: 260px 1fr 280px;
-  height: calc(100vh - 60px);
+  grid-template-columns: 260px 1fr;
+  height: 100vh;
 }
 
-aside, main {
+/* TRACK LIST */
+#tracks {
+  background: #1a1a1a;
   padding: 10px;
-  border-right: 1px solid #333;
   overflow-y: auto;
 }
 
-canvas {
-  background: #111;
-  border: 1px solid #444;
-}
-
 .track {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  padding: 6px;
+  border-bottom: 1px solid #333;
   cursor: pointer;
 }
 
 .track.active {
-  background: #333;
+  background: #2a2a2a;
 }
 
-.track label {
-  width: 110px;
-  font-size: 12px;
-}
-
-input[type=range] {
-  flex: 1;
-}
-
-button {
-  background: #333;
-  color: white;
-  border: none;
-  padding: 6px 10px;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-button:hover {
-  background: #555;
-}
-
-footer {
-  height: 60px;
-  background: #111;
-  border-top: 1px solid #333;
+.track-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.track-controls button {
+  font-size: 10px;
+}
+
+/* EQ PANEL */
+#eq-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: 10px;
+}
+
+canvas {
+  background: #000;
+  border: 1px solid #333;
+}
+
+#add-band {
+  margin-top: 10px;
 }
 </style>
 </head>
 
 <body>
 <div id="app">
+  <aside id="tracks">
+    <button id="load">Load Tracks</button>
+    <div id="track-list"></div>
+  </aside>
 
-<!-- TRACK LIST -->
-<aside>
-  <h3>Tracks</h3>
-  <div id="track-list"></div>
-  <button id="load">Load Tracks</button>
-</aside>
-
-<!-- EQ PANEL -->
-<main style="display:flex; flex-direction:column; align-items:center;">
-  <canvas id="eq" width="900" height="400"></canvas>
-  <button id="add-band" style="margin-top:10px;">Add EQ Band</button>
-</main>
-
-<!-- EQ CONTROLS -->
-<aside>
-  <h3 id="eq-title">Select a Track</h3>
-  <div id="bands"></div>
-</aside>
-
+  <main id="eq-panel">
+    <canvas id="eq" width="900" height="400"></canvas>
+    <button id="add-band">Add EQ Band</button>
+  </main>
 </div>
 
-<footer>
-  <button id="play">Play</button>
-  <button id="stop">Stop</button>
-</footer>
+<script>
+/* =======================
+   AUDIO ENGINE
+======================= */
 
-<script type="module">
-/* ======================================================
-   AUDIO CONTEXT & MIX BUS
-====================================================== */
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-const master = audioCtx.createGain();
-const analyser = audioCtx.createAnalyser();
-const mixBus = audioCtx.createGain();
+const audioContext = new AudioContext();
+const mixBus = audioContext.createGain();
+mixBus.connect(audioContext.destination);
 
-mixBus.connect(analyser);
-analyser.connect(master);
-master.connect(audioCtx.destination);
-
-analyser.fftSize = 2048;
-const spectrum = new Uint8Array(analyser.frequencyBinCount);
-
-/* ======================================================
-   TRACK DEFINITIONS
-====================================================== */
 const trackNames = [
   "Kick Drum",
   "Snare Drum",
@@ -141,72 +104,47 @@ const trackNames = [
 const tracks = [];
 let selectedTrack = null;
 
-/* ======================================================
+/* =======================
    LOAD TRACKS
-====================================================== */
+======================= */
+
+document.getElementById("load").onclick = loadTracks;
+
 async function loadTracks() {
-  tracks.length = 0;
-  document.getElementById("track-list").innerHTML = "";
-
   for (const name of trackNames) {
-    const res = await fetch(`./audio/${name}.wav`);
-    const buf = await audioCtx.decodeAudioData(await res.arrayBuffer());
+    const res = await fetch(`audio/${name}.wav`);
+    const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-    const eqIn = audioCtx.createGain();
-    const eqOut = audioCtx.createGain();
-    eqIn.connect(eqOut);
+    const gainNode = audioContext.createGain();
+    const eqInput = audioContext.createGain();
+    const eqOutput = audioContext.createGain();
 
-    const gain = audioCtx.createGain();
-    gain.gain.value = 0.8;
-
-    eqOut.connect(gain);
-    gain.connect(mixBus);
+    eqInput.connect(eqOutput);
+    eqOutput.connect(gainNode);
+    gainNode.connect(mixBus);
 
     tracks.push({
       name,
-      buffer: buf,
+      buffer,
       source: null,
-      gain,
-      eqIn,
-      eqOut,
-      eqBands: []
+      gainNode,
+      eqInput,
+      eqOutput,
+      eqBands: [],
+      muted: false,
+      solo: false
     });
   }
 
   buildTrackUI();
-  alert("Tracks loaded!");
+  selectedTrack = tracks[0];
+  drawEQ();
 }
 
-/* ======================================================
-   PLAYBACK
-====================================================== */
-function playAll() {
-  if (audioCtx.state === "suspended") audioCtx.resume();
-  stopAll();
-
-  tracks.forEach(t => {
-    const src = audioCtx.createBufferSource();
-    src.buffer = t.buffer;
-    src.loop = true;
-    src.connect(t.eqIn);
-    t.source = src;
-    src.start();
-  });
-}
-
-function stopAll() {
-  tracks.forEach(t => {
-    if (t.source) {
-      t.source.stop();
-      t.source.disconnect();
-      t.source = null;
-    }
-  });
-}
-
-/* ======================================================
+/* =======================
    TRACK UI
-====================================================== */
+======================= */
+
 function buildTrackUI() {
   const list = document.getElementById("track-list");
   list.innerHTML = "";
@@ -214,160 +152,170 @@ function buildTrackUI() {
   tracks.forEach(track => {
     const row = document.createElement("div");
     row.className = "track";
+    row.textContent = track.name;
 
-    const label = document.createElement("label");
-    label.textContent = track.name;
+    row.onclick = () => {
+      document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
+      row.classList.add("active");
+      selectedTrack = track;
+    };
+
+    const controls = document.createElement("div");
+    controls.className = "track-controls";
+
+    const mute = document.createElement("button");
+    mute.textContent = "M";
+    mute.onclick = e => {
+      e.stopPropagation();
+      track.muted = !track.muted;
+      track.gainNode.gain.value = track.muted ? 0 : 1;
+    };
+
+    const solo = document.createElement("button");
+    solo.textContent = "S";
+    solo.onclick = e => {
+      e.stopPropagation();
+      tracks.forEach(t => {
+        t.gainNode.gain.value = (t === track) ? 1 : 0;
+      });
+    };
 
     const fader = document.createElement("input");
     fader.type = "range";
     fader.min = 0;
     fader.max = 1;
     fader.step = 0.01;
-    fader.value = track.gain.gain.value;
+    fader.value = 1;
+    fader.oninput = () => track.gainNode.gain.value = fader.value;
 
-    fader.oninput = () => {
-      track.gain.gain.value = fader.value;
-    };
-
-    row.onclick = () => selectTrack(track, row);
-
-    row.append(label, fader);
+    controls.append(mute, solo, fader);
+    row.appendChild(controls);
     list.appendChild(row);
   });
 }
 
-function selectTrack(track, row) {
-  document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
-  row.classList.add("active");
+/* =======================
+   PLAYBACK
+======================= */
 
-  selectedTrack = track;
-  document.getElementById("eq-title").textContent = track.name + " EQ";
-  updateBandUI();
-}
+document.body.onclick = () => audioContext.resume();
 
-/* ======================================================
-   EQ
-====================================================== */
-function rebuildEQ(track) {
-  track.eqIn.disconnect();
-  track.eqBands.forEach(b => b.node.disconnect());
-
-  let node = track.eqIn;
-  track.eqBands.forEach(b => {
-    node.connect(b.node);
-    node = b.node;
+function play() {
+  tracks.forEach(track => {
+    const src = audioContext.createBufferSource();
+    src.buffer = track.buffer;
+    src.connect(track.eqInput);
+    src.start();
+    track.source = src;
   });
-
-  node.connect(track.eqOut);
 }
 
-function addEQBand() {
+play();
+
+/* =======================
+   EQ ENGINE
+======================= */
+
+const canvas = document.getElementById("eq");
+const ctx = canvas.getContext("2d");
+
+const FREQ_MIN = 20;
+const FREQ_MAX = 20000;
+const GAIN_MIN = -24;
+const GAIN_MAX = 24;
+
+document.getElementById("add-band").onclick = () => {
   if (!selectedTrack) return;
 
-  const node = audioCtx.createBiquadFilter();
+  const node = audioContext.createBiquadFilter();
   node.type = "peaking";
   node.frequency.value = 1000;
   node.gain.value = 0;
   node.Q.value = 1;
 
-  selectedTrack.eqBands.push({ node });
+  selectedTrack.eqBands.push(node);
   rebuildEQ(selectedTrack);
-  updateBandUI();
+};
+
+function rebuildEQ(track) {
+  track.eqInput.disconnect();
+  track.eqBands.forEach(b => b.disconnect());
+
+  let last = track.eqInput;
+  track.eqBands.forEach(b => {
+    last.connect(b);
+    last = b;
+  });
+  last.connect(track.eqOutput);
 }
 
-/* ======================================================
-   EQ BAND UI
-====================================================== */
-function updateBandUI() {
-  const panel = document.getElementById("bands");
-  panel.innerHTML = "";
+/* =======================
+   EQ DRAWING
+======================= */
+
+function freqToX(freq) {
+  return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
+}
+
+function gainToY(g) {
+  return canvas.height - ((g - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * canvas.height;
+}
+
+function drawGrid() {
+  ctx.strokeStyle = "#333";
+  ctx.fillStyle = "#666";
+  ctx.font = "10px sans-serif";
+
+  [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
+    const x = freqToX(f);
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+    ctx.fillText(f >= 1000 ? f/1000 + "k" : f, x+2, canvas.height-4);
+  });
+
+  for (let db = -24; db <= 24; db += 6) {
+    const y = gainToY(db);
+    ctx.beginPath();
+    ctx.moveTo(0,y);
+    ctx.lineTo(canvas.width,y);
+    ctx.stroke();
+    ctx.fillText(db + "dB", 4, y-2);
+  }
+}
+
+function drawEQ() {
+  requestAnimationFrame(drawEQ);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawGrid();
 
   if (!selectedTrack) return;
 
-  selectedTrack.eqBands.forEach((band, i) => {
-    const div = document.createElement("div");
+  ctx.strokeStyle = "#0f0";
+  ctx.beginPath();
 
-    const type = document.createElement("select");
-    ["peaking","lowshelf","highshelf","lowpass","highpass"].forEach(t => {
-      const o = document.createElement("option");
-      o.value = t;
-      o.textContent = t;
-      if (band.node.type === t) o.selected = true;
-      type.appendChild(o);
+  for (let x = 0; x < canvas.width; x++) {
+    const freq = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width);
+    let mag = 1;
+
+    selectedTrack.eqBands.forEach(b => {
+      mag *= b.getFrequencyResponse(
+        new Float32Array([freq]),
+        new Float32Array(1),
+        new Float32Array(1)
+      )[1][0];
     });
-    type.onchange = () => band.node.type = type.value;
 
-    const remove = document.createElement("button");
-    remove.textContent = "Remove";
-    remove.onclick = () => {
-      selectedTrack.eqBands.splice(i,1);
-      rebuildEQ(selectedTrack);
-      updateBandUI();
-    };
-
-    div.append(type, remove);
-    panel.appendChild(div);
-  });
-}
-
-/* ======================================================
-   EQ GRAPH + ANALYZER
-====================================================== */
-const canvas = document.getElementById("eq");
-const ctx = canvas.getContext("2d");
-
-const FMIN = 20, FMAX = 20000;
-const GMIN = -24, GMAX = 24;
-
-function fx(freq) {
-  return Math.log10(freq / FMIN) / Math.log10(FMAX / FMIN) * canvas.width;
-}
-function fy(db) {
-  db = Math.max(GMIN, Math.min(GMAX, db));
-  return canvas.height - (db - GMIN) / (GMAX - GMIN) * canvas.height;
-}
-
-function draw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = "#111";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  analyser.getByteFrequencyData(spectrum);
-  ctx.fillStyle = "#4caf50";
-  spectrum.forEach((v,i)=>{
-    const x=i/spectrum.length*canvas.width;
-    ctx.fillRect(x, canvas.height, 1, -v/255*canvas.height);
-  });
-
-  if (selectedTrack) {
-    ctx.beginPath();
-    ctx.strokeStyle = "#ff4081";
-    for (let x=0;x<canvas.width;x++) {
-      const freq = FMIN * Math.pow(FMAX/FMIN, x/canvas.width);
-      let mag = 1;
-      selectedTrack.eqBands.forEach(b=>{
-        const f=new Float32Array([freq]);
-        const m=new Float32Array(1);
-        b.node.getFrequencyResponse(f,m,new Float32Array(1));
-        mag*=m[0];
-      });
-      const y = fy(20*Math.log10(mag));
-      x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-    }
-    ctx.stroke();
+    const db = 20 * Math.log10(mag);
+    const y = gainToY(db);
+    if (x === 0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
   }
-
-  requestAnimationFrame(draw);
+  ctx.stroke();
 }
-draw();
 
-/* ======================================================
-   BUTTONS
-====================================================== */
-document.getElementById("load").onclick = loadTracks;
-document.getElementById("play").onclick = playAll;
-document.getElementById("stop").onclick = stopAll;
-document.getElementById("add-band").onclick = addEQBand;
+drawEQ();
 </script>
 </body>
 </html>
