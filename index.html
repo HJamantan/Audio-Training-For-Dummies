@@ -130,282 +130,289 @@ button {
 </div>
 
 <script>
-/* =======================
-   AUDIO ENGINE
-======================= */
+document.addEventListener("DOMContentLoaded", () => {
 
-const audioContext = new AudioContext();
-const mixBus = audioContext.createGain();
-mixBus.connect(audioContext.destination);
+  /* =======================
+     AUDIO ENGINE
+  ======================= */
 
-const trackNames = [
-  "Kick Drum",
-  "Snare Drum",
-  "Tom 1",
-  "Tom 2",
-  "Over Head",
-  "Bass Guitar",
-  "Acoustic Guitar",
-  "Keyboard (Nord)",
-  "Electric Guitar",
-  "Male Vocal",
-  "Female Vocal"
-];
+  const audioContext = new AudioContext();
+  const mixBus = audioContext.createGain();
+  mixBus.connect(audioContext.destination);
 
-const tracks = [];
-let selectedTrack = null;
+  const trackNames = [
+    "Kick Drum",
+    "Snare Drum",
+    "Tom 1",
+    "Tom 2",
+    "Over Head",
+    "Bass Guitar",
+    "Acoustic Guitar",
+    "Keyboard (Nord)",
+    "Electric Guitar",
+    "Male Vocal",
+    "Female Vocal"
+  ];
 
-/* =======================
-   LOAD TRACKS
-======================= */
+  const tracks = [];
+  let selectedTrack = null;
 
-document.getElementById("load").onclick = loadTracks;
+  /* =======================
+     LOAD TRACKS
+  ======================= */
 
-async function loadTracks() {
-  tracks.length = 0;
-  document.getElementById("track-list").innerHTML = "";
+  document.getElementById("load").onclick = loadTracks;
 
-  for (const name of trackNames) {
-    const res = await fetch(`audio/${name}.wav`);
-    const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+  async function loadTracks() {
+    tracks.length = 0;
+    document.getElementById("track-list").innerHTML = "";
 
-    const gainNode = audioContext.createGain();
-    const eqInput = audioContext.createGain();
-    const eqOutput = audioContext.createGain();
+    for (const name of trackNames) {
+      const res = await fetch(`audio/${name}.wav`);
+      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-    eqInput.connect(eqOutput);
-    eqOutput.connect(gainNode);
-    gainNode.connect(mixBus);
+      const gainNode = audioContext.createGain();
+      const eqInput = audioContext.createGain();
+      const eqOutput = audioContext.createGain();
 
-    tracks.push({
-      name,
-      buffer,
-      source: null,
-      gainNode,
-      eqInput,
-      eqOutput,
-      eqBands: [],
-      muted: false,
-      solo: false
+      eqInput.connect(eqOutput);
+      eqOutput.connect(gainNode);
+      gainNode.connect(mixBus);
+
+      tracks.push({
+        name,
+        buffer,
+        source: null,
+        gainNode,
+        eqInput,
+        eqOutput,
+        eqBands: [],
+        muted: false,
+        solo: false
+      });
+    }
+
+    buildTrackUI();
+    selectedTrack = tracks[0];
+  }
+
+  /* =======================
+     TRACK UI
+  ======================= */
+
+  function buildTrackUI() {
+    const list = document.getElementById("track-list");
+    list.innerHTML = "";
+
+    tracks.forEach(track => {
+      const row = document.createElement("div");
+      row.className = "track";
+      row.textContent = track.name;
+
+      row.onclick = () => {
+        document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
+        row.classList.add("active");
+        selectedTrack = track;
+      };
+
+      const controls = document.createElement("div");
+      controls.className = "track-controls";
+
+      const mute = document.createElement("button");
+      mute.textContent = "M";
+      mute.onclick = e => {
+        e.stopPropagation();
+        track.muted = !track.muted;
+        mute.classList.toggle("muted", track.muted);
+        updateMuteSolo();
+      };
+
+      const solo = document.createElement("button");
+      solo.textContent = "S";
+      solo.onclick = e => {
+        e.stopPropagation();
+        track.solo = !track.solo;
+        solo.classList.toggle("soloed", track.solo);
+        updateMuteSolo();
+      };
+
+      const fader = document.createElement("input");
+      fader.type = "range";
+      fader.min = 0;
+      fader.max = 1;
+      fader.step = 0.01;
+      fader.value = 1;
+      fader.oninput = () => track.gainNode.gain.value = fader.value;
+
+      controls.append(mute, solo, fader);
+      row.appendChild(controls);
+      list.appendChild(row);
     });
   }
 
-  buildTrackUI();
-  selectedTrack = tracks[0];
-}
-
-/* =======================
-   TRACK UI
-======================= */
-
-function buildTrackUI() {
-  const list = document.getElementById("track-list");
-  list.innerHTML = "";
-
-  tracks.forEach(track => {
-    const row = document.createElement("div");
-    row.className = "track";
-    row.textContent = track.name;
-
-    row.onclick = () => {
-      document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
-      row.classList.add("active");
-      selectedTrack = track;
-    };
-
-    const controls = document.createElement("div");
-    controls.className = "track-controls";
-
-    const mute = document.createElement("button");
-    mute.textContent = "M";
-    mute.onclick = e => {
-      e.stopPropagation();
-      track.muted = !track.muted;
-      mute.classList.toggle("muted", track.muted);
-      updateMuteSolo();
-    };
-
-    const solo = document.createElement("button");
-    solo.textContent = "S";
-    solo.onclick = e => {
-      e.stopPropagation();
-      track.solo = !track.solo;
-      solo.classList.toggle("soloed", track.solo);
-      updateMuteSolo();
-    };
-
-    const fader = document.createElement("input");
-    fader.type = "range";
-    fader.min = 0;
-    fader.max = 1;
-    fader.step = 0.01;
-    fader.value = 1;
-    fader.oninput = () => track.gainNode.gain.value = fader.value;
-
-    controls.append(mute, solo, fader);
-    row.appendChild(controls);
-    list.appendChild(row);
-  });
-}
-
-function updateMuteSolo() {
-  const anySolo = tracks.some(t => t.solo);
-  tracks.forEach(t => {
-    if (anySolo) {
-      t.gainNode.gain.value = t.solo && !t.muted ? 1 : 0;
-    } else {
-      t.gainNode.gain.value = t.muted ? 0 : 1;
-    }
-  });
-}
-
-/* =======================
-   PLAYBACK
-======================= */
-
-document.getElementById("play").onclick = play;
-document.getElementById("stop").onclick = stop;
-document.body.onclick = () => audioContext.resume();
-
-function play() {
-  stop();
-  tracks.forEach(track => {
-    const src = audioContext.createBufferSource();
-    src.buffer = track.buffer;
-    src.connect(track.eqInput);
-    src.start();
-    track.source = src;
-  });
-}
-
-function stop() {
-  tracks.forEach(track => {
-    if (track.source) {
-      track.source.stop();
-      track.source = null;
-    }
-  });
-}
-
-/* =======================
-   EQ ENGINE
-======================= */
-
-const canvas = document.getElementById("eq");
-const ctx = canvas.getContext("2d");
-
-const FREQ_MIN = 20;
-const FREQ_MAX = 20000;
-const GAIN_MIN = -24;
-const GAIN_MAX = 24;
-
-document.getElementById("add-band").onclick = () => {
-  if (!selectedTrack) return;
-
-  const node = audioContext.createBiquadFilter();
-  node.type = "peaking";
-  node.frequency.value = 1000;
-  node.gain.value = 0;
-  node.Q.value = 1;
-
-  selectedTrack.eqBands.push({
-    node,
-    frequency: 1000,
-    gain: 0,
-    Q: 1,
-    type: "peaking"
-  });
-
-  rebuildEQ(selectedTrack);
-};
-
-function rebuildEQ(track) {
-  track.eqInput.disconnect();
-
-  track.eqBands.forEach(b => {
-    b.node.disconnect();
-    b.node.frequency.value = b.frequency;
-    b.node.gain.value = b.gain;
-    b.node.Q.value = b.Q;
-    b.node.type = b.type;
-  });
-
-  let last = track.eqInput;
-  track.eqBands.forEach(b => {
-    last.connect(b.node);
-    last = b.node;
-  });
-
-  last.connect(track.eqOutput);
-}
-
-/* =======================
-   EQ DRAWING
-======================= */
-
-function freqToX(freq) {
-  return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
-}
-
-function gainToY(g) {
-  return canvas.height - ((g - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * canvas.height;
-}
-
-function drawGrid() {
-  ctx.strokeStyle = "#333";
-  ctx.fillStyle = "#666";
-  ctx.font = "10px sans-serif";
-
-  [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
-    const x = freqToX(f);
-    ctx.beginPath();
-    ctx.moveTo(x,0);
-    ctx.lineTo(x,canvas.height);
-    ctx.stroke();
-    ctx.fillText(f >= 1000 ? f/1000 + "k" : f, x+2, canvas.height-4);
-  });
-
-  for (let db = -24; db <= 24; db += 6) {
-    const y = gainToY(db);
-    ctx.beginPath();
-    ctx.moveTo(0,y);
-    ctx.lineTo(canvas.width,y);
-    ctx.stroke();
-    ctx.fillText(db + "dB", 4, y-2);
+  function updateMuteSolo() {
+    const anySolo = tracks.some(t => t.solo);
+    tracks.forEach(t => {
+      if (anySolo) {
+        t.gainNode.gain.value = t.solo && !t.muted ? 1 : 0;
+      } else {
+        t.gainNode.gain.value = t.muted ? 0 : 1;
+      }
+    });
   }
-}
 
-function drawEQ() {
-  requestAnimationFrame(drawEQ);
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  drawGrid();
+  /* =======================
+     PLAYBACK
+  ======================= */
 
-  if (!selectedTrack) return;
+  document.getElementById("play").onclick = play;
+  document.getElementById("stop").onclick = stop;
+  document.body.onclick = () => audioContext.resume();
 
-  ctx.strokeStyle = "#0f0";
-  ctx.beginPath();
+  function play() {
+    stop();
+    tracks.forEach(track => {
+      const src = audioContext.createBufferSource();
+      src.buffer = track.buffer;
+      src.connect(track.eqInput);
+      src.start();
+      track.source = src;
+    });
+  }
 
-  for (let x = 0; x < canvas.width; x++) {
-    const freq = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width);
-    let mag = 1;
+  function stop() {
+    tracks.forEach(track => {
+      if (track.source) {
+        track.source.stop();
+        track.source = null;
+      }
+    });
+  }
 
-    selectedTrack.eqBands.forEach(b => {
-  const freqArr = new Float32Array([freq]);
-  const magArr = new Float32Array(1);
-  const phaseArr = new Float32Array(1);
+  /* =======================
+     EQ ENGINE
+  ======================= */
 
-  b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
-  mag *= magArr[0];
+  const canvas = document.getElementById("eq");
+  const ctx = canvas.getContext("2d");
+
+  const FREQ_MIN = 20;
+  const FREQ_MAX = 20000;
+  const GAIN_MIN = -24;
+  const GAIN_MAX = 24;
+
+  // TEMPORARY DEBUG: Verify the Add Band button click fires!
+  document.getElementById("add-band").onclick = () => {
+    console.log("ADD BAND CLICKED");
+    if (!selectedTrack) return;
+
+    const node = audioContext.createBiquadFilter();
+    node.type = "peaking";
+    node.frequency.value = 1000;
+    node.gain.value = 0;
+    node.Q.value = 1;
+
+    selectedTrack.eqBands.push({
+      node,
+      frequency: 1000,
+      gain: 0,
+      Q: 1,
+      type: "peaking"
+    });
+
+    rebuildEQ(selectedTrack);
+    console.log("Band added, total bands:", selectedTrack.eqBands.length);
+  };
+
+  function rebuildEQ(track) {
+    track.eqInput.disconnect();
+
+    track.eqBands.forEach(b => {
+      b.node.disconnect();
+      b.node.frequency.value = b.frequency;
+      b.node.gain.value = b.gain;
+      b.node.Q.value = b.Q;
+      b.node.type = b.type;
+    });
+
+    let last = track.eqInput;
+    track.eqBands.forEach(b => {
+      last.connect(b.node);
+      last = b.node;
+    });
+
+    last.connect(track.eqOutput);
+  }
+
+  /* =======================
+     EQ DRAWING
+  ======================= */
+
+  function freqToX(freq) {
+    return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
+  }
+
+  function gainToY(g) {
+    return canvas.height - ((g - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * canvas.height;
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = "#333";
+    ctx.fillStyle = "#666";
+    ctx.font = "10px sans-serif";
+
+    [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
+      const x = freqToX(f);
+      ctx.beginPath();
+      ctx.moveTo(x,0);
+      ctx.lineTo(x,canvas.height);
+      ctx.stroke();
+      ctx.fillText(f >= 1000 ? f/1000 + "k" : f, x+2, canvas.height-4);
+    });
+
+    for (let db = -24; db <= 24; db += 6) {
+      const y = gainToY(db);
+      ctx.beginPath();
+      ctx.moveTo(0,y);
+      ctx.lineTo(canvas.width,y);
+      ctx.stroke();
+      ctx.fillText(db + "dB", 4, y-2);
+    }
+  }
+
+  function drawEQ() {
+    requestAnimationFrame(drawEQ);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawGrid();
+
+    if (!selectedTrack) return;
+
+    ctx.strokeStyle = "#0f0";
+    ctx.beginPath();
+
+    for (let x = 0; x < canvas.width; x++) {
+      const freq = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width);
+      let mag = 1;
+
+      selectedTrack.eqBands.forEach(b => {
+        const freqArr = new Float32Array([freq]);
+        const magArr = new Float32Array(1);
+        const phaseArr = new Float32Array(1);
+
+        b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
+        mag *= magArr[0];
+      });
+
+      const db = 20 * Math.log10(mag);
+      const y = gainToY(db);
+      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  drawEQ();
+
 });
-
-    const db = 20 * Math.log10(mag);
-    const y = gainToY(db);
-    x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-  }
-  ctx.stroke();
-}
-
-drawEQ();
 </script>
 </body>
 </html>
