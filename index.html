@@ -39,7 +39,7 @@
   }
 
   footer {
-    height: 60px;
+    height: 70px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -84,7 +84,7 @@
   <div id="app">
     <aside id="audio-list">
       <h3>Audio</h3>
-      <button id="load-audio">Load Demo</button>
+      <button id="load-audio">Kick Drum</button>
     </aside>
 
     <main id="eq-panel">
@@ -127,13 +127,10 @@ const eqBands = [];
 ------------------------------------------------------ */
 async function loadAudio() {
   try {
-    const res = await fetch("./audio/demo.wav");
+    const res = await fetch("./audio/Kick Drum.wav");
     const buf = await res.arrayBuffer();
     audioBuffer = await audioContext.decodeAudioData(buf);
-    alert("Audio loaded! Click Play to start.");
   } catch(e) {
-    alert("Failed to load audio demo.wav. Make sure the file exists in /audio folder.");
-    console.error(e);
   }
 }
 
@@ -185,7 +182,7 @@ function rebuildGraph() {
 ------------------------------------------------------ */
 function play() {
   if (!audioBuffer) {
-    alert("Load audio first!");
+  
     return;
   }
 
