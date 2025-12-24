@@ -293,13 +293,25 @@ document.addEventListener("DOMContentLoaded", () => {
       const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
       const gainNode = audioContext.createGain();
-      const eqInput = audioContext.createGain();
-      const eqOutput = audioContext.createGain();
+const eqInput = audioContext.createGain();
+const eqOutput = audioContext.createGain();
 
-      eqInput.connect(eqOutput);
-      eqOutput.connect(compressor);
-      compressor.connect(gainNode);
-      gainNode.connect(mixBus);
+// EQ internal routing
+eqInput.connect(eqOutput);
+
+// 🔹 ADD THIS — create compressor BEFORE push()
+const compressor = audioContext.createDynamicsCompressor();
+compressor.threshold.value = -24;
+compressor.ratio.value = 4;
+compressor.attack.value = 0.01;
+compressor.release.value = 0.25;
+
+// 🔹 ROUTING
+eqOutput.connect(compressor);
+compressor.connect(gainNode);
+
+gainNode.connect(mixBus);
+
 
       const compressor = audioContext.createDynamicsCompressor();
 compressor.threshold.value = -24;
