@@ -299,25 +299,17 @@ const eqOutput = audioContext.createGain();
 // EQ internal routing
 eqInput.connect(eqOutput);
 
-// 🔹 ADD THIS — create compressor BEFORE push()
 const compressor = audioContext.createDynamicsCompressor();
 compressor.threshold.value = -24;
 compressor.ratio.value = 4;
 compressor.attack.value = 0.01;
 compressor.release.value = 0.25;
 
-// 🔹 ROUTING
+// ROUTING
 eqOutput.connect(compressor);
 compressor.connect(gainNode);
 
 gainNode.connect(mixBus);
-
-
-      const compressor = audioContext.createDynamicsCompressor();
-compressor.threshold.value = -24;
-compressor.ratio.value = 4;
-compressor.attack.value = 0.01;
-compressor.release.value = 0.25;
 
 tracks.push({
   name,
