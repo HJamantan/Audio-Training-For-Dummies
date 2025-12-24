@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Interactive Web EQ & Dynamics Trainer</title>
+<title>Interactive Web EQ Trainer with Band Type Selector</title>
 
 <style>
 body {
@@ -124,52 +124,6 @@ button:disabled {
   cursor: pointer;
 }
 
-/* DYNAMICS BOXES */
-#dynamics-container {
-  margin-top: 20px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  color: #ddd;
-  font-size: 14px;
-  user-select: none;
-}
-
-.dynamic-box {
-  background: #1a1a1a;
-  border: 1px solid #444;
-  padding: 12px;
-  width: 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-radius: 6px;
-}
-
-.dynamic-box h4 {
-  margin: 0 0 6px 0;
-  text-align: center;
-  color: #8af;
-  font-weight: normal;
-}
-
-.dynamic-box label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dynamic-box select {
-  background: #222;
-  color: #ddd;
-  border: 1px solid #444;
-  padding: 4px 6px;
-  font-size: 14px;
-  cursor: pointer;
-  min-width: 140px;
-}
-
 /* FX RACK */
 #fx-rack {
   background: #1a1a1a;
@@ -213,52 +167,6 @@ button:disabled {
         <option value="notch">Notch</option>
         <option value="allpass">All Pass</option>
       </select>
-    </div>
-
-    <!-- Dynamics Boxes -->
-    <div id="dynamics-container">
-      <div class="dynamic-box" id="dynamic1">
-        <h4>Dynamic Processor 1</h4>
-        <label>
-          Position:
-          <select class="dyn-position">
-            <option value="pre">Pre EQ</option>
-            <option value="post">Post EQ</option>
-          </select>
-        </label>
-        <label>
-          Processor:
-          <select class="dyn-type">
-            <option value="bypass">Bypass</option>
-            <option value="gate">Gate</option>
-            <option value="compressor">Compressor</option>
-            <option value="deesser">De-Esser</option>
-            <option value="expander">Expander</option>
-            <option value="limiter">Limiter</option>
-          </select>
-        </label>
-      </div>
-      <div class="dynamic-box" id="dynamic2">
-        <h4>Dynamic Processor 2</h4>
-        <label>
-          Position:
-          <select class="dyn-position">
-            <option value="pre">Pre EQ</option>
-            <option value="post">Post EQ</option>
-          </select>
-        </label>
-        <label>
-          Processor:
-          <select class="dyn-type">
-            <option value="bypass">Bypass</option>
-            <option value="gate">Gate</option>
-            <option value="compressor">Compressor</option>
-            <option value="deesser">De-Esser</option>
-            <option value="expander">Expander</option>
-            <option value="limiter">Limiter</option>
-          </select>
-        </label>
-      </div>
     </div>
   </main>
 
@@ -309,40 +217,33 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("track-list").innerHTML = "";
 
     for (const name of trackNames) {
-      try {
-        const res = await fetch(`audio/${name}.wav`);
-        const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+      const res = await fetch(`audio/${name}.wav`);
+      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-        const gainNode = audioContext.createGain();
-        const eqInput = audioContext.createGain();
-        const eqOutput = audioContext.createGain();
+      const gainNode = audioContext.createGain();
+      const eqInput = audioContext.createGain();
+      const eqOutput = audioContext.createGain();
 
-        const dynamicProcessors = [
-          { position: "pre", type: "bypass", node: createBypassNode() },
-          { position: "post", type: "bypass", node: createBypassNode() }
-        ];
+      eqInput.connect(eqOutput);
+      eqOutput.connect(gainNode);
+      gainNode.connect(mixBus);
 
-        tracks.push({
-          name,
-          buffer,
-          source: null,
-          gainNode,
-          eqInput,
-          eqOutput,
-          eqBands: [],
-          muted: false,
-          solo: false,
-          dynamics: dynamicProcessors
-        });
-      } catch(e) {
-        console.error(`Error loading track "${name}":`, e);
-      }
+      tracks.push({
+        name,
+        buffer,
+        source: null,
+        gainNode,
+        eqInput,
+        eqOutput,
+        eqBands: [],
+        muted: false,
+        solo: false
+      });
     }
 
     buildTrackUI();
-    selectedTrack = tracks[0] || null;
+    selectedTrack = tracks[0];
     setSelectedBand(null);
-    updateDynamicsUI();
   }
 
   /* =======================
@@ -363,7 +264,6 @@ document.addEventListener("DOMContentLoaded", () => {
         row.classList.add("active");
         selectedTrack = track;
         setSelectedBand(null);
-        updateDynamicsUI();
       };
 
       const controls = document.createElement("div");
@@ -416,131 +316,28 @@ document.addEventListener("DOMContentLoaded", () => {
      PLAYBACK
   ======================= */
 
-  document.getElementById("play").onclick = async () => {
-    console.log('Play button clicked');
-    await play();
-  };
+  document.getElementById("play").onclick = play;
   document.getElementById("stop").onclick = stop;
   document.body.onclick = () => audioContext.resume();
 
-  async function play() {
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
-      console.log('AudioContext resumed');
-    }
-
+  function play() {
     stop();
-
     tracks.forEach(track => {
-      if (!track.buffer) return;
-
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
+      src.connect(track.eqInput);
+      src.start();
       track.source = src;
-
-      connectDynamicChain(track);
-
-      try {
-        src.start();
-        console.log(`Started track: ${track.name}`);
-      } catch (e) {
-        console.error(`Failed to start track ${track.name}:`, e);
-      }
     });
-
-    console.log('Playback started');
   }
 
   function stop() {
     tracks.forEach(track => {
       if (track.source) {
-        try {
-          track.source.stop();
-          track.source.disconnect();
-        } catch(e) {
-          console.warn('Error stopping track source', e);
-        }
+        track.source.stop();
         track.source = null;
-        console.log(`Stopped track: ${track.name}`);
       }
     });
-    console.log('Playback stopped');
-  }
-
-  /* =======================
-     DYNAMIC PROCESSORS - NODE CREATORS (STUBS)
-  ======================= */
-
-  function createBypassNode() {
-    const gainNode = audioContext.createGain();
-    gainNode.gain.value = 1;
-    return gainNode;
-  }
-
-  function createCompressorNode() {
-    return audioContext.createDynamicsCompressor();
-  }
-
-  function createGateNode() {
-    return createBypassNode();
-  }
-
-  function createDeEsserNode() {
-    return createBypassNode();
-  }
-
-  function createExpanderNode() {
-    return createBypassNode();
-  }
-
-  function createLimiterNode() {
-    return createBypassNode();
-  }
-
-  /* =======================
-     CONNECT DYNAMIC CHAIN BASED ON SETTINGS
-  ======================= */
-
-  function connectDynamicChain(track) {
-    try { track.dynamics[0].node.disconnect(); } catch {}
-    try { track.eqInput.disconnect(); } catch {}
-    try { track.eqOutput.disconnect(); } catch {}
-    try { track.dynamics[1].node.disconnect(); } catch {}
-    try { track.gainNode.disconnect(); } catch {}
-
-    const dyn1 = track.dynamics[0];
-    const dyn2 = track.dynamics[1];
-
-    // Chain routing based on dynamic positions
-    if (dyn1.position === "pre" && dyn2.position === "post") {
-      track.source.connect(dyn1.node);
-      dyn1.node.connect(track.eqInput);
-      rebuildEQ(track);
-      track.eqOutput.connect(dyn2.node);
-      dyn2.node.connect(track.gainNode);
-    } else if (dyn1.position === "pre" && dyn2.position === "pre") {
-      track.source.connect(dyn1.node);
-      dyn1.node.connect(dyn2.node);
-      dyn2.node.connect(track.eqInput);
-      rebuildEQ(track);
-      track.eqOutput.connect(track.gainNode);
-    } else if (dyn1.position === "post" && dyn2.position === "pre") {
-      track.source.connect(dyn2.node);
-      dyn2.node.connect(track.eqInput);
-      rebuildEQ(track);
-      track.eqOutput.connect(dyn1.node);
-      dyn1.node.connect(track.gainNode);
-    } else if (dyn1.position === "post" && dyn2.position === "post") {
-      track.source.connect(track.eqInput);
-      rebuildEQ(track);
-      track.eqOutput.connect(dyn1.node);
-      dyn1.node.connect(dyn2.node);
-      dyn2.node.connect(track.gainNode);
-    } else {
-      track.source.connect(track.eqInput);
-      rebuildEQ(track);
-      track.eqOutput.connect(track.gainNode);
-    }
   }
 
   /* =======================
@@ -558,6 +355,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let draggingBand = null;
   let selectedBand = null;
   let lastMousePos = null;
+  let isDragging = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let hoveredBandAtDraw = null;
 
   function freqToX(freq) {
     return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
@@ -579,246 +380,287 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function rebuildEQ(track) {
     try { track.eqInput.disconnect(); } catch(e) {}
-    track.eqBands.forEach(band => band.node.disconnect());
-
-    if (track.eqBands.length === 0) {
-      track.eqInput.connect(track.eqOutput);
-      return;
-    }
-
-    let prevNode = track.eqInput;
-    track.eqBands.forEach(band => {
-      band.node.type = band.type;
-      band.node.frequency.value = band.freq;
-      band.node.gain.value = band.gain;
-      band.node.Q.value = band.Q;
-      prevNode.connect(band.node);
-      prevNode = band.node;
+    track.eqBands.forEach(b => {
+      try { b.node.disconnect(); } catch(e) {}
+      b.node.frequency.value = b.frequency;
+      b.node.gain.value = b.gain;
+      b.node.Q.value = b.Q;
+      b.node.type = b.type;
     });
 
-    prevNode.connect(track.eqOutput);
+    let last = track.eqInput;
+    track.eqBands.forEach(b => {
+      last.connect(b.node);
+      last = b.node;
+    });
+
+    last.connect(track.eqOutput);
   }
-
-  function drawEQ() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw frequency grid lines & labels
-    ctx.fillStyle = "#666";
-    ctx.font = "12px monospace";
-    ctx.textAlign = "center";
-
-    const freqs = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
-    freqs.forEach(f => {
-      const x = freqToX(f);
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.strokeStyle = "#333";
-      ctx.stroke();
-      ctx.fillText(f >= 1000 ? (f/1000) + "k" : f, x, canvas.height - 4);
-    });
-
-    // Draw gain lines
-    ctx.strokeStyle = "#333";
-    for (let g = GAIN_MIN; g <= GAIN_MAX; g += 6) {
-      const y = gainToY(g);
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-      ctx.fillText(g + "dB", 30, y - 2);
-    }
-
-    // Draw frequency response curve for selected track
-    if (!selectedTrack) return;
-
-    const eqResponse = new Float32Array(canvas.width);
-
-    for (let i = 0; i < canvas.width; i++) {
-      const freq = xToFreq(i);
-      let mag = 1;
-
-      selectedTrack.eqBands.forEach(band => {
-        const nodeType = band.type;
-        const f0 = band.freq;
-        const Q = band.Q;
-        const gain = band.gain;
-
-        // Simplified peaking filter gain calc (not perfect)
-        if (nodeType === "peaking") {
-          const A = Math.pow(10, gain / 40);
-          const w0 = 2 * Math.PI * f0 / 44100;
-          const alpha = Math.sin(w0) / (2 * Q);
-          // This is a simplified gain approximation for visualization:
-          const deltaF = Math.abs(freq - f0);
-          if (deltaF < f0 / Q) {
-            mag *= A;
-          }
-        }
-      });
-
-      eqResponse[i] = mag;
-    }
-
-    ctx.beginPath();
-    ctx.strokeStyle = "#09f";
-    ctx.lineWidth = 2;
-
-    for (let i = 0; i < canvas.width; i++) {
-      const mag = eqResponse[i];
-      const y = gainToY(20 * Math.log10(mag));
-      if (i === 0) ctx.moveTo(i, y);
-      else ctx.lineTo(i, y);
-    }
-    ctx.stroke();
-
-    // Draw EQ bands
-    selectedTrack.eqBands.forEach((band, i) => {
-      const x = freqToX(band.freq);
-      const y = gainToY(band.gain);
-      ctx.beginPath();
-      ctx.arc(x, y, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = band === selectedBand ? "#f90" : "#09f";
-      ctx.fill();
-      ctx.strokeStyle = "#000";
-      ctx.stroke();
-    });
-  }
-
-  // Add Band button
-  document.getElementById("add-band").onclick = () => {
-    if (!selectedTrack) return;
-    const newBand = {
-      type: "peaking",
-      freq: 1000,
-      gain: 0,
-      Q: 1,
-      node: audioContext.createBiquadFilter()
-    };
-    selectedTrack.eqBands.push(newBand);
-    rebuildEQ(selectedTrack);
-    setSelectedBand(newBand);
-    drawEQ();
-  };
-
-  // Delete Band button
-  document.getElementById("delete-band").onclick = () => {
-    if (!selectedTrack || !selectedBand) return;
-    const index = selectedTrack.eqBands.indexOf(selectedBand);
-    if (index >= 0) {
-      selectedTrack.eqBands[index].node.disconnect();
-      selectedTrack.eqBands.splice(index, 1);
-      setSelectedBand(null);
-      rebuildEQ(selectedTrack);
-      drawEQ();
-    }
-  };
 
   function setSelectedBand(band) {
     selectedBand = band;
-    document.getElementById("delete-band").disabled = !band;
-    document.getElementById("band-type-select").disabled = !band;
-    if (band) {
-      document.getElementById("band-type-select").value = band.type;
-    }
+    updateDeleteButton();
+    updateBandTypeSelect();
   }
 
-  // Band type selector change
-  document.getElementById("band-type-select").onchange = e => {
-    if (!selectedBand) return;
-    selectedBand.type = e.target.value;
-    selectedBand.node.type = selectedBand.type;
+  document.getElementById("add-band").onclick = () => {
+    if (!selectedTrack) return;
+
+    const node = audioContext.createBiquadFilter();
+    node.type = "peaking";
+    node.frequency.value = 1000;
+    node.gain.value = 0;
+    node.Q.value = 1;
+
+    const newBand = {
+      node,
+      frequency: 1000,
+      gain: 0,
+      Q: 1,
+      type: "peaking"
+    };
+
+    selectedTrack.eqBands.push(newBand);
+    setSelectedBand(newBand);
     rebuildEQ(selectedTrack);
-    drawEQ();
   };
 
-  // Canvas interaction for dragging bands (simplified)
-  canvas.onmousedown = e => {
-    if (!selectedTrack) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    for (const band of selectedTrack.eqBands) {
-      const x = freqToX(band.freq);
-      const y = gainToY(band.gain);
-      const dx = mouseX - x;
-      const dy = mouseY - y;
-      if (dx * dx + dy * dy < 64) { // 8px radius
-        draggingBand = band;
-        lastMousePos = { x: mouseX, y: mouseY };
-        setSelectedBand(band);
-        drawEQ();
-        break;
-      }
+  document.getElementById("delete-band").onclick = () => {
+    if (!selectedTrack || !selectedBand) return;
+    const idx = selectedTrack.eqBands.indexOf(selectedBand);
+    if (idx !== -1) {
+      selectedBand.node.disconnect();
+      selectedTrack.eqBands.splice(idx, 1);
+      setSelectedBand(null);
+      rebuildEQ(selectedTrack);
     }
   };
 
-  canvas.onmouseup = e => {
-    draggingBand = null;
-    lastMousePos = null;
-  };
+  function updateDeleteButton() {
+    const btn = document.getElementById("delete-band");
+    btn.disabled = !selectedBand;
+  }
 
-  canvas.onmousemove = e => {
-    if (!draggingBand) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+  const bandTypeSelect = document.getElementById("band-type-select");
 
-    // Calculate freq and gain changes based on mouse movement
-    const freq = xToFreq(mouseX);
-    const gain = yToGain(mouseY);
-
-    draggingBand.freq = Math.min(Math.max(freq, FREQ_MIN), FREQ_MAX);
-    draggingBand.gain = Math.min(Math.max(gain, GAIN_MIN), GAIN_MAX);
-
+  bandTypeSelect.onchange = () => {
+    if (!selectedTrack || !selectedBand) return;
+    selectedBand.type = bandTypeSelect.value;
+    selectedBand.node.type = bandTypeSelect.value;
     rebuildEQ(selectedTrack);
-    drawEQ();
   };
 
-  // Initial draw
-  drawEQ();
+  function updateBandTypeSelect() {
+    if (selectedBand) {
+      bandTypeSelect.disabled = false;
+      bandTypeSelect.value = selectedBand.type;
+    } else {
+      bandTypeSelect.disabled = true;
+    }
+  }
 
   /* =======================
-     DYNAMIC PROCESSOR UI UPDATE
+     DRAWING & INTERACTIVITY
   ======================= */
 
-  function updateDynamicsUI() {
+  function drawGrid() {
+    ctx.strokeStyle = "#333";
+    ctx.fillStyle = "#666";
+    ctx.font = "10px sans-serif";
+
+    [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
+      const x = freqToX(f);
+      ctx.beginPath();
+      ctx.moveTo(x,0);
+      ctx.lineTo(x,canvas.height);
+      ctx.stroke();
+      ctx.fillText(f >= 1000 ? (f/1000) + "k" : f, x+2, canvas.height-4);
+    });
+
+    for (let db = -24; db <= 24; db += 6) {
+      const y = gainToY(db);
+      ctx.beginPath();
+      ctx.moveTo(0,y);
+      ctx.lineTo(canvas.width,y);
+      ctx.stroke();
+      ctx.fillText(db + " dB", 4, y-2);
+    }
+  }
+
+  function drawEQ() {
+    requestAnimationFrame(drawEQ);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+
     if (!selectedTrack) return;
 
-    const dynamicsContainers = document.querySelectorAll(".dynamic-box");
-    dynamicsContainers.forEach((container, idx) => {
-      const positionSelect = container.querySelector(".dyn-position");
-      const typeSelect = container.querySelector(".dyn-type");
+    // Draw frequency response curve of selected track only
+    ctx.strokeStyle = "#0f0";
+    ctx.beginPath();
 
-      const dyn = selectedTrack.dynamics[idx];
-      positionSelect.value = dyn.position;
-      typeSelect.value = dyn.type;
+    for (let x = 0; x < canvas.width; x++) {
+      const freq = xToFreq(x);
+      let mag = 1;
 
-      positionSelect.onchange = () => {
-        dyn.position = positionSelect.value;
-        connectDynamicChain(selectedTrack);
-      };
+      selectedTrack.eqBands.forEach(b => {
+        const freqArr = new Float32Array([freq]);
+        const magArr = new Float32Array(1);
+        const phaseArr = new Float32Array(1);
+        b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
+        mag *= magArr[0];
+      });
 
-      typeSelect.onchange = () => {
-        dyn.type = typeSelect.value;
-        // Replace the node according to type
-        dyn.node.disconnect();
-        switch (dyn.type) {
-          case "bypass": dyn.node = createBypassNode(); break;
-          case "compressor": dyn.node = createCompressorNode(); break;
-          case "gate": dyn.node = createGateNode(); break;
-          case "deesser": dyn.node = createDeEsserNode(); break;
-          case "expander": dyn.node = createExpanderNode(); break;
-          case "limiter": dyn.node = createLimiterNode(); break;
-          default: dyn.node = createBypassNode();
+      const db = 20 * Math.log10(mag);
+      const y = gainToY(db);
+      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // Draw EQ bands as draggable circles
+    let hoveredBand = null;
+    selectedTrack.eqBands.forEach(band => {
+      const x = freqToX(band.frequency);
+      const y = gainToY(band.gain);
+
+      ctx.beginPath();
+      ctx.fillStyle = (band === draggingBand) ? "#ff0" : (band === selectedBand ? "#0ff" : "#0f0");
+      ctx.strokeStyle = "#090";
+      ctx.lineWidth = 2;
+      ctx.arc(x, y, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw Q value as small text near band
+      ctx.fillStyle = "#0f0";
+      ctx.font = "10px sans-serif";
+      ctx.fillText("Q:" + band.Q.toFixed(2), x + 12, y - 12);
+
+      // Check if mouse is near band to change cursor (for UX)
+      if (lastMousePos) {
+        const dx = lastMousePos.x - x;
+        const dy = lastMousePos.y - y;
+        if (dx * dx + dy * dy <= 64) { // 8*8 radius squared
+          hoveredBand = band;
         }
-        connectDynamicChain(selectedTrack);
-      };
+      }
     });
+
+    canvas.classList.toggle("band-hover", hoveredBand !== null && !isDragging);
+    canvas.classList.toggle("band-dragging", isDragging);
+    hoveredBandAtDraw = hoveredBand; // save for wheel event
   }
+
+  /* =======================
+     INTERACTION
+  ======================= */
+
+  function findBandAtPos(x, y) {
+    if (!selectedTrack) return null;
+    return selectedTrack.eqBands.find(b => {
+      const bx = freqToX(b.frequency);
+      const by = gainToY(b.gain);
+      const dx = x - bx;
+      const dy = y - by;
+      return dx * dx + dy * dy <= 64;
+    }) || null;
+  }
+
+  canvas.addEventListener("mousedown", e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const band = findBandAtPos(mx, my);
+    if (band) {
+      draggingBand = band;
+      setSelectedBand(band);
+      isDragging = true;
+      dragOffsetX = mx - freqToX(band.frequency);
+      dragOffsetY = my - gainToY(band.gain);
+      e.preventDefault();
+    } else {
+      setSelectedBand(null);
+    }
+  });
+
+  canvas.addEventListener("mouseup", e => {
+    if (isDragging) {
+      isDragging = false;
+      draggingBand = null;
+      e.preventDefault();
+    }
+  });
+
+  canvas.addEventListener("mouseleave", e => {
+    if (isDragging) {
+      isDragging = false;
+      draggingBand = null;
+    }
+  });
+
+  canvas.addEventListener("mousemove", e => {
+    lastMousePos = (() => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    })();
+
+    if (!isDragging || !draggingBand) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left - dragOffsetX;
+    const my = e.clientY - rect.top - dragOffsetY;
+
+    draggingBand.frequency = xToFreq(mx);
+    draggingBand.gain = yToGain(my);
+
+    draggingBand.node.frequency.value = draggingBand.frequency;
+    draggingBand.node.gain.value = draggingBand.gain;
+
+    rebuildEQ(selectedTrack);
+  });
+
+  // Mouse wheel changes Q when hovering over band
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    if (!hoveredBandAtDraw) return;
+
+    const delta = e.deltaY || e.detail || e.wheelDelta;
+    const step = 0.1;
+    hoveredBandAtDraw.Q += (delta > 0 ? -step : step);
+
+    // Clamp Q between 0.1 and 18 (typical practical range)
+    hoveredBandAtDraw.Q = Math.min(Math.max(hoveredBandAtDraw.Q, 0.1), 18);
+
+    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
+    rebuildEQ(selectedTrack);
+  }, { passive: false });
+
+  // Right click deletes band
+  canvas.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const band = findBandAtPos(mx, my);
+    if (band && selectedTrack) {
+      const idx = selectedTrack.eqBands.indexOf(band);
+      if (idx !== -1) {
+        band.node.disconnect();
+        selectedTrack.eqBands.splice(idx, 1);
+        if (band === selectedBand) setSelectedBand(null);
+        rebuildEQ(selectedTrack);
+      }
+    }
+  });
+
+  drawEQ();
 
 });
 </script>
+
 </body>
 </html>
