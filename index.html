@@ -186,7 +186,6 @@ button:disabled {
   <!-- FX RACK -->
   <aside id="fx-rack">
     <h3>FX Rack</h3>
-    <p>(Per-track FX coming next)</p>
 
     <!-- NEW DYNAMICS PANEL -->
     <div id="dynamics">
@@ -514,9 +513,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (selectedBand) bandTypeSelect.value = selectedBand.type;
   }
 
-  /* =======================
-     DRAWING (with labels!)
-  ======================= */
+  /* =======
+     DRAWING
+  ======= */
 
   function drawGrid() {
     ctx.strokeStyle = "#333";
