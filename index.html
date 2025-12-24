@@ -258,11 +258,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  bindRange("threshold", "threshVal", compressor.threshold);
-  bindRange("ratio", "ratioVal", compressor.ratio);
-  bindRange("attack", "attackVal", compressor.attack);
-  bindRange("release", "releaseVal", compressor.release);
+  function updateDynamicsUI() {
+  if (!selectedTrack) return;
 
+  const c = selectedTrack.compressor;
+
+  document.getElementById("threshVal").textContent = c.threshold.value;
+  document.getElementById("ratioVal").textContent = c.ratio.value;
+  document.getElementById("attackVal").textContent = c.attack.value;
+  document.getElementById("releaseVal").textContent = c.release.value;
+}
 
   const trackNames = [
     "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
@@ -292,19 +297,31 @@ document.addEventListener("DOMContentLoaded", () => {
       const eqOutput = audioContext.createGain();
 
       eqInput.connect(eqOutput);
-      eqOutput.connect(gainNode);
+      eqOutput.connect(compressor);
+      compressor.connect(gainNode);
       gainNode.connect(mixBus);
 
-      tracks.push({
-        name,
-        buffer,
-        source: null,
-        gainNode,
-        eqInput,
-        eqOutput,
-        eqBands: [],
-        muted: false,
-        solo: false
+      const compressor = audioContext.createDynamicsCompressor();
+compressor.threshold.value = -24;
+compressor.ratio.value = 4;
+compressor.attack.value = 0.01;
+compressor.release.value = 0.25;
+
+tracks.push({
+  name,
+  buffer,
+  source: null,
+  gainNode,
+  eqInput,
+  eqOutput,
+  compressor,
+  gainReduction: 0,
+  eqBands: [],
+  muted: false,
+  solo: false
+  analyser: audioContext.createAnalyser(),
+});
+track.analyser.fftSize = 2048;
       });
     }
 
@@ -331,6 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
         row.classList.add("active");
         selectedTrack = track;
         setSelectedBand(null);
+        updateDynamicsUI();
       };
 
       const controls = document.createElement("div");
@@ -362,7 +380,13 @@ document.addEventListener("DOMContentLoaded", () => {
       fader.value = 0.75;
       fader.oninput = () => track.gainNode.gain.value = fader.value;
 
-      controls.append(mute, solo, fader);
+      const grMeter = document.createElement("div");
+grMeter.style.height = "6px";
+grMeter.style.background = "#400";
+grMeter.style.width = "0px";
+
+track.grMeter = grMeter;
+      controls.append(mute, solo, fader, grMeter);
       row.appendChild(controls);
       list.appendChild(row);
     });
@@ -377,6 +401,10 @@ document.addEventListener("DOMContentLoaded", () => {
         t.gainNode.gain.value = t.muted ? 0 : 1;
       }
     });
+    track.compressor.threshold.value = compressor.threshold.value;
+track.compressor.ratio.value = compressor.ratio.value;
+track.compressor.attack.value = compressor.attack.value;
+track.compressor.release.value = compressor.release.value;
   }
 
   /* =======================
@@ -392,7 +420,8 @@ document.addEventListener("DOMContentLoaded", () => {
     tracks.forEach(track => {
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
-      src.connect(track.eqInput);
+      src.connect(track.analyser);
+      track.analyser.connect(track.eqInput);
       src.start();
       track.source = src;
     });
@@ -474,6 +503,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("add-band").onclick = () => {
     if (!selectedTrack) return;
+    // ===== LIVE SPECTRUM DISPLAY =====
+const analyser = selectedTrack.analyser;
+const data = new Uint8Array(analyser.frequencyBinCount);
+analyser.getByteFrequencyData(data);
+
+ctx.strokeStyle = "#08f";
+ctx.beginPath();
+
+for (let i = 0; i < data.length; i++) {
+  const freq = i * audioContext.sampleRate / (2 * data.length);
+  const x = freqToX(freq);
+
+  // Convert magnitude (0–255) roughly to dB scale
+  const norm = data[i] / 255;
+  const db = GAIN_MIN + norm * (GAIN_MAX - GAIN_MIN);
+
+  const y = gainToY(db);
+
+  if (i === 0) ctx.moveTo(x, y);
+  else ctx.lineTo(x, y);
+}
+
+ctx.stroke();
+// ===== END SPECTRUM =====
 
     const node = audioContext.createBiquadFilter();
     node.type = "peaking";
@@ -567,6 +620,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const phaseArr = new Float32Array(1);
         b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
         mag *= magArr[0];
+        
+        tracks.forEach(track => {
+  const gr = track.compressor.reduction;
+  track.gainReduction = gr;
+});
+
+tracks.forEach(track => {
+  const gr = Math.abs(track.gainReduction); // positive number
+  const pct = Math.min(gr / 20, 1);         // scale 0–20dB
+  track.grMeter.style.width = (pct * 100) + "%";
+});
       });
 
       const db = 20 * Math.log10(mag);
