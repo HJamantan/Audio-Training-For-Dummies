@@ -309,48 +309,38 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("track-list").innerHTML = "";
 
     for (const name of trackNames) {
-      const res = await fetch(`audio/${name}.wav`);
-      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+      try {
+        const res = await fetch(`audio/${name}.wav`);
+        const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-      // Basic nodes for routing:
-      // source -> dyn1(pre or post) -> eqInput -> eqBands chain -> eqOutput -> dyn2(pre or post) -> gain -> mixBus
+        const gainNode = audioContext.createGain();
+        const eqInput = audioContext.createGain();
+        const eqOutput = audioContext.createGain();
 
-      const gainNode = audioContext.createGain();
+        const dynamicProcessors = [
+          { position: "pre", type: "bypass", node: createBypassNode() },
+          { position: "post", type: "bypass", node: createBypassNode() }
+        ];
 
-      // EQ nodes:
-      const eqInput = audioContext.createGain();
-      const eqOutput = audioContext.createGain();
-
-      // Dynamic processors stubs - create nodes but don't connect yet
-      const dynamicProcessors = [
-        { // Dynamic Processor 1
-          position: "pre", // "pre" or "post"
-          type: "bypass", // current processor type
-          node: createBypassNode()
-        },
-        { // Dynamic Processor 2
-          position: "post",
-          type: "bypass",
-          node: createBypassNode()
-        }
-      ];
-
-      tracks.push({
-        name,
-        buffer,
-        source: null,
-        gainNode,
-        eqInput,
-        eqOutput,
-        eqBands: [],
-        muted: false,
-        solo: false,
-        dynamics: dynamicProcessors
-      });
+        tracks.push({
+          name,
+          buffer,
+          source: null,
+          gainNode,
+          eqInput,
+          eqOutput,
+          eqBands: [],
+          muted: false,
+          solo: false,
+          dynamics: dynamicProcessors
+        });
+      } catch(e) {
+        console.error(`Error loading track "${name}":`, e);
+      }
     }
 
     buildTrackUI();
-    selectedTrack = tracks[0];
+    selectedTrack = tracks[0] || null;
     setSelectedBand(null);
     updateDynamicsUI();
   }
@@ -426,33 +416,55 @@ document.addEventListener("DOMContentLoaded", () => {
      PLAYBACK
   ======================= */
 
-  document.getElementById("play").onclick = play;
+  document.getElementById("play").onclick = async () => {
+    console.log('Play button clicked');
+    await play();
+  };
   document.getElementById("stop").onclick = stop;
   document.body.onclick = () => audioContext.resume();
 
-  function play() {
+  async function play() {
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+      console.log('AudioContext resumed');
+    }
+
     stop();
+
     tracks.forEach(track => {
+      if (!track.buffer) return;
+
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
-      // Connect source directly; chain connections done later in connectDynamicChain
       track.source = src;
 
-      // Connect source to first node in chain based on dyn positions:
       connectDynamicChain(track);
 
-      src.start();
+      try {
+        src.start();
+        console.log(`Started track: ${track.name}`);
+      } catch (e) {
+        console.error(`Failed to start track ${track.name}:`, e);
+      }
     });
+
+    console.log('Playback started');
   }
 
   function stop() {
     tracks.forEach(track => {
       if (track.source) {
-        track.source.stop();
-        track.source.disconnect();
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch(e) {
+          console.warn('Error stopping track source', e);
+        }
         track.source = null;
+        console.log(`Stopped track: ${track.name}`);
       }
     });
+    console.log('Playback stopped');
   }
 
   /* =======================
@@ -469,8 +481,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return audioContext.createDynamicsCompressor();
   }
 
-  // Placeholder for gate, de-esser, expander, limiter:
-  // For now, just bypass gain nodes. Future: implement proper DSP or find libraries.
   function createGateNode() {
     return createBypassNode();
   }
@@ -484,7 +494,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function createLimiterNode() {
-    // Could be DynamicsCompressorNode with extreme ratio, or bypass for now
     return createBypassNode();
   }
 
@@ -493,62 +502,43 @@ document.addEventListener("DOMContentLoaded", () => {
   ======================= */
 
   function connectDynamicChain(track) {
+    try { track.dynamics[0].node.disconnect(); } catch {}
+    try { track.eqInput.disconnect(); } catch {}
+    try { track.eqOutput.disconnect(); } catch {}
+    try { track.dynamics[1].node.disconnect(); } catch {}
+    try { track.gainNode.disconnect(); } catch {}
+
     const dyn1 = track.dynamics[0];
     const dyn2 = track.dynamics[1];
 
-    // Disconnect all nodes safely
-    if (track.source && track.source.disconnect) {
-      try { track.source.disconnect(); } catch {}
-    }
-    if (dyn1.node && dyn1.node.disconnect) {
-      try { dyn1.node.disconnect(); } catch {}
-    }
-    if (track.eqInput && track.eqInput.disconnect) {
-      try { track.eqInput.disconnect(); } catch {}
-    }
-    if (track.eqOutput && track.eqOutput.disconnect) {
-      try { track.eqOutput.disconnect(); } catch {}
-    }
-    if (dyn2.node && dyn2.node.disconnect) {
-      try { dyn2.node.disconnect(); } catch {}
-    }
-    if (track.gainNode && track.gainNode.disconnect) {
-      try { track.gainNode.disconnect(); } catch {}
-    }
-
-    // Safety check - if any node missing, skip connection to avoid errors
-    if (!track.source || !dyn1.node || !track.eqInput || !track.eqOutput || !dyn2.node || !track.gainNode) {
-      console.warn("Missing audio nodes in track for dynamic chain connection", track);
-      return;
-    }
-
-    // Rebuild EQ nodes chain before connecting
-    rebuildEQ(track);
-
-    // Chain from source:
+    // Chain routing based on dynamic positions
     if (dyn1.position === "pre" && dyn2.position === "post") {
       track.source.connect(dyn1.node);
       dyn1.node.connect(track.eqInput);
+      rebuildEQ(track);
       track.eqOutput.connect(dyn2.node);
       dyn2.node.connect(track.gainNode);
     } else if (dyn1.position === "pre" && dyn2.position === "pre") {
       track.source.connect(dyn1.node);
       dyn1.node.connect(dyn2.node);
       dyn2.node.connect(track.eqInput);
+      rebuildEQ(track);
       track.eqOutput.connect(track.gainNode);
     } else if (dyn1.position === "post" && dyn2.position === "pre") {
       track.source.connect(dyn2.node);
       dyn2.node.connect(track.eqInput);
+      rebuildEQ(track);
       track.eqOutput.connect(dyn1.node);
       dyn1.node.connect(track.gainNode);
     } else if (dyn1.position === "post" && dyn2.position === "post") {
       track.source.connect(track.eqInput);
+      rebuildEQ(track);
       track.eqOutput.connect(dyn1.node);
       dyn1.node.connect(dyn2.node);
       dyn2.node.connect(track.gainNode);
     } else {
-      // fallback default chain
       track.source.connect(track.eqInput);
+      rebuildEQ(track);
       track.eqOutput.connect(track.gainNode);
     }
   }
@@ -589,9 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function rebuildEQ(track) {
     try { track.eqInput.disconnect(); } catch(e) {}
-    track.eqBands.forEach(band => {
-      try { band.node.disconnect(); } catch {}
-    });
+    track.eqBands.forEach(band => band.node.disconnect());
 
     if (track.eqBands.length === 0) {
       track.eqInput.connect(track.eqOutput);
@@ -632,103 +620,135 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Draw gain lines
     ctx.strokeStyle = "#333";
-    ctx.beginPath();
     for (let g = GAIN_MIN; g <= GAIN_MAX; g += 6) {
       const y = gainToY(g);
+      ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+      ctx.fillText(g + "dB", 30, y - 2);
+    }
+
+    // Draw frequency response curve for selected track
+    if (!selectedTrack) return;
+
+    const eqResponse = new Float32Array(canvas.width);
+
+    for (let i = 0; i < canvas.width; i++) {
+      const freq = xToFreq(i);
+      let mag = 1;
+
+      selectedTrack.eqBands.forEach(band => {
+        const nodeType = band.type;
+        const f0 = band.freq;
+        const Q = band.Q;
+        const gain = band.gain;
+
+        // Simplified peaking filter gain calc (not perfect)
+        if (nodeType === "peaking") {
+          const A = Math.pow(10, gain / 40);
+          const w0 = 2 * Math.PI * f0 / 44100;
+          const alpha = Math.sin(w0) / (2 * Q);
+          // This is a simplified gain approximation for visualization:
+          const deltaF = Math.abs(freq - f0);
+          if (deltaF < f0 / Q) {
+            mag *= A;
+          }
+        }
+      });
+
+      eqResponse[i] = mag;
+    }
+
+    ctx.beginPath();
+    ctx.strokeStyle = "#09f";
+    ctx.lineWidth = 2;
+
+    for (let i = 0; i < canvas.width; i++) {
+      const mag = eqResponse[i];
+      const y = gainToY(20 * Math.log10(mag));
+      if (i === 0) ctx.moveTo(i, y);
+      else ctx.lineTo(i, y);
     }
     ctx.stroke();
 
-    // Draw bands
-    if (!selectedTrack) return;
-
+    // Draw EQ bands
     selectedTrack.eqBands.forEach((band, i) => {
       const x = freqToX(band.freq);
       const y = gainToY(band.gain);
-
-      // Draw band point
       ctx.beginPath();
       ctx.arc(x, y, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = i === selectedBand ? "#0af" : "#08a";
+      ctx.fillStyle = band === selectedBand ? "#f90" : "#09f";
       ctx.fill();
-
-      // Draw band Q radius (circle)
-      const qRadius = 60 / band.Q;
-      ctx.strokeStyle = i === selectedBand ? "#0af" : "#08a";
-      ctx.beginPath();
-      ctx.arc(x, y, qRadius, 0, 2 * Math.PI);
+      ctx.strokeStyle = "#000";
       ctx.stroke();
     });
   }
 
-  function setSelectedBand(i) {
-    selectedBand = i;
-    document.getElementById("delete-band").disabled = i === null;
-    updateBandTypeUI();
-    drawEQ();
-  }
-
-  function updateBandTypeUI() {
-    const select = document.getElementById("band-type-select");
-    if (selectedBand === null || !selectedTrack) {
-      select.disabled = true;
-      select.value = "";
-      return;
-    }
-    select.disabled = false;
-    select.value = selectedTrack.eqBands[selectedBand].type;
-  }
-
-  // Add band
+  // Add Band button
   document.getElementById("add-band").onclick = () => {
     if (!selectedTrack) return;
-    const band = {
+    const newBand = {
+      type: "peaking",
       freq: 1000,
       gain: 0,
       Q: 1,
-      type: "peaking",
       node: audioContext.createBiquadFilter()
     };
-    selectedTrack.eqBands.push(band);
+    selectedTrack.eqBands.push(newBand);
     rebuildEQ(selectedTrack);
-    setSelectedBand(selectedTrack.eqBands.length - 1);
+    setSelectedBand(newBand);
+    drawEQ();
   };
 
-  // Delete band
+  // Delete Band button
   document.getElementById("delete-band").onclick = () => {
-    if (selectedBand === null || !selectedTrack) return;
-    selectedTrack.eqBands.splice(selectedBand, 1);
-    rebuildEQ(selectedTrack);
-    setSelectedBand(null);
+    if (!selectedTrack || !selectedBand) return;
+    const index = selectedTrack.eqBands.indexOf(selectedBand);
+    if (index >= 0) {
+      selectedTrack.eqBands[index].node.disconnect();
+      selectedTrack.eqBands.splice(index, 1);
+      setSelectedBand(null);
+      rebuildEQ(selectedTrack);
+      drawEQ();
+    }
   };
 
-  // Band type change
+  function setSelectedBand(band) {
+    selectedBand = band;
+    document.getElementById("delete-band").disabled = !band;
+    document.getElementById("band-type-select").disabled = !band;
+    if (band) {
+      document.getElementById("band-type-select").value = band.type;
+    }
+  }
+
+  // Band type selector change
   document.getElementById("band-type-select").onchange = e => {
-    if (selectedBand === null || !selectedTrack) return;
-    selectedTrack.eqBands[selectedBand].type = e.target.value;
+    if (!selectedBand) return;
+    selectedBand.type = e.target.value;
+    selectedBand.node.type = selectedBand.type;
     rebuildEQ(selectedTrack);
     drawEQ();
   };
 
-  // Canvas mouse interaction for moving freq/gain/Q
+  // Canvas interaction for dragging bands (simplified)
   canvas.onmousedown = e => {
     if (!selectedTrack) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    // Find band within radius
-    const radius = 10;
-    for (let i = 0; i < selectedTrack.eqBands.length; i++) {
-      const band = selectedTrack.eqBands[i];
-      const bx = freqToX(band.freq);
-      const by = gainToY(band.gain);
-      if (Math.hypot(bx - x, by - y) < radius) {
-        draggingBand = i;
-        setSelectedBand(i);
-        lastMousePos = {x, y};
-        canvas.classList.add("band-dragging");
+    for (const band of selectedTrack.eqBands) {
+      const x = freqToX(band.freq);
+      const y = gainToY(band.gain);
+      const dx = mouseX - x;
+      const dy = mouseY - y;
+      if (dx * dx + dy * dy < 64) { // 8px radius
+        draggingBand = band;
+        lastMousePos = { x: mouseX, y: mouseY };
+        setSelectedBand(band);
+        drawEQ();
         break;
       }
     }
@@ -737,125 +757,66 @@ document.addEventListener("DOMContentLoaded", () => {
   canvas.onmouseup = e => {
     draggingBand = null;
     lastMousePos = null;
-    canvas.classList.remove("band-dragging");
-  };
-
-  canvas.onmouseleave = e => {
-    draggingBand = null;
-    lastMousePos = null;
-    canvas.classList.remove("band-dragging");
   };
 
   canvas.onmousemove = e => {
-    if (draggingBand === null || !selectedTrack) return;
-
+    if (!draggingBand) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    const band = selectedTrack.eqBands[draggingBand];
+    // Calculate freq and gain changes based on mouse movement
+    const freq = xToFreq(mouseX);
+    const gain = yToGain(mouseY);
 
-    if (!lastMousePos) {
-      lastMousePos = {x, y};
-      return;
-    }
-
-    const dx = x - lastMousePos.x;
-    const dy = y - lastMousePos.y;
-
-    // Adjust frequency with horizontal movement
-    let freq = xToFreq(freqToX(band.freq) + dx);
-    freq = Math.min(Math.max(freq, FREQ_MIN), FREQ_MAX);
-
-    // Adjust gain with vertical movement
-    let gain = yToGain(y);
-    gain = Math.min(Math.max(gain, GAIN_MIN), GAIN_MAX);
-
-    // Adjust Q with shift key (horizontal drag while holding shift)
-    let Q = band.Q;
-    if (e.shiftKey) {
-      Q += dx * 0.01;
-      Q = Math.min(Math.max(Q, 0.1), 20);
-    }
-
-    band.freq = freq;
-    band.gain = gain;
-    band.Q = Q;
+    draggingBand.freq = Math.min(Math.max(freq, FREQ_MIN), FREQ_MAX);
+    draggingBand.gain = Math.min(Math.max(gain, GAIN_MIN), GAIN_MAX);
 
     rebuildEQ(selectedTrack);
     drawEQ();
-
-    lastMousePos = {x, y};
   };
 
-  /* =======================
-     DYNAMICS UI & HANDLERS
-  ======================= */
+  // Initial draw
+  drawEQ();
 
-  const dynamicContainers = [document.getElementById("dynamic1"), document.getElementById("dynamic2")];
+  /* =======================
+     DYNAMIC PROCESSOR UI UPDATE
+  ======================= */
 
   function updateDynamicsUI() {
     if (!selectedTrack) return;
-    dynamicContainers.forEach((container, idx) => {
-      const posSelect = container.querySelector(".dyn-position");
+
+    const dynamicsContainers = document.querySelectorAll(".dynamic-box");
+    dynamicsContainers.forEach((container, idx) => {
+      const positionSelect = container.querySelector(".dyn-position");
       const typeSelect = container.querySelector(".dyn-type");
 
       const dyn = selectedTrack.dynamics[idx];
-      posSelect.value = dyn.position;
+      positionSelect.value = dyn.position;
       typeSelect.value = dyn.type;
+
+      positionSelect.onchange = () => {
+        dyn.position = positionSelect.value;
+        connectDynamicChain(selectedTrack);
+      };
+
+      typeSelect.onchange = () => {
+        dyn.type = typeSelect.value;
+        // Replace the node according to type
+        dyn.node.disconnect();
+        switch (dyn.type) {
+          case "bypass": dyn.node = createBypassNode(); break;
+          case "compressor": dyn.node = createCompressorNode(); break;
+          case "gate": dyn.node = createGateNode(); break;
+          case "deesser": dyn.node = createDeEsserNode(); break;
+          case "expander": dyn.node = createExpanderNode(); break;
+          case "limiter": dyn.node = createLimiterNode(); break;
+          default: dyn.node = createBypassNode();
+        }
+        connectDynamicChain(selectedTrack);
+      };
     });
   }
-
-  dynamicContainers.forEach((container, idx) => {
-    const posSelect = container.querySelector(".dyn-position");
-    const typeSelect = container.querySelector(".dyn-type");
-
-    posSelect.onchange = e => {
-      if (!selectedTrack) return;
-      selectedTrack.dynamics[idx].position = e.target.value;
-      connectDynamicChain(selectedTrack);
-    };
-
-    typeSelect.onchange = e => {
-      if (!selectedTrack) return;
-
-      const newType = e.target.value;
-      selectedTrack.dynamics[idx].type = newType;
-
-      // Disconnect old node safely
-      try {
-        if (selectedTrack.dynamics[idx].node && selectedTrack.dynamics[idx].node.disconnect) {
-          selectedTrack.dynamics[idx].node.disconnect();
-        }
-      } catch {}
-
-      // Create new processor node based on type
-      let newNode = null;
-      switch(newType) {
-        case "bypass": newNode = createBypassNode(); break;
-        case "compressor": newNode = createCompressorNode(); break;
-        case "gate": newNode = createGateNode(); break;
-        case "deesser": newNode = createDeEsserNode(); break;
-        case "expander": newNode = createExpanderNode(); break;
-        case "limiter": newNode = createLimiterNode(); break;
-        default: newNode = createBypassNode(); break;
-      }
-      selectedTrack.dynamics[idx].node = newNode;
-
-      connectDynamicChain(selectedTrack);
-    };
-  });
-
-  /* =======================
-     INITIAL DRAW & SETUP
-  ======================= */
-
-  function init() {
-    buildTrackUI();
-    drawEQ();
-  }
-
-  init();
 
 });
 </script>
