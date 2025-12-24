@@ -321,8 +321,10 @@ tracks.push({
   solo: false,
   analyser: audioContext.createAnalyser(),
 });
+
+const track = tracks[tracks.length - 1];
 track.analyser.fftSize = 2048;
-      });
+
     }
 
     buildTrackUI();
