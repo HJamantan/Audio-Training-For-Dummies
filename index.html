@@ -700,8 +700,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   drawEQ();
-
-  /* ============ LOOPING PLAYBACK ============ */
+/* ============ LOOPING PLAYBACK ============ */
 
   document.getElementById("play").onclick = play;
   document.getElementById("stop").onclick = stop;
@@ -727,58 +726,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
-  /* ============ COMPRESSOR UI BINDS PER TRACK ============ */
-
-  const thresholdEl = document.getElementById("threshold");
-  const ratioEl = document.getElementById("ratio");
-  const attackEl = document.getElementById("attack");
-  const releaseEl = document.getElementById("release");
-
-  const threshVal = document.getElementById("threshVal");
-  const ratioVal = document.getElementById("ratioVal");
-  const attackVal = document.getElementById("attackVal");
-  const releaseVal = document.getElementById("releaseVal");
-
-  compEnabled.addEventListener("change", () => {
-    if (!selectedTrack) return;
-    selectedTrack.compBypassed = !compEnabled.checked;
-    updateTrackCompressorRouting(selectedTrack);
-  });
-
-  function updateTrackCompressorRouting(track) {
-    try { track.eqOutput.disconnect(); } catch(e){}
-    if (track.compBypassed) {
-      track.eqOutput.connect(track.gainNode);
-    } else {
-      track.eqOutput.connect(track.compressor);
-    }
-  }
-
-  function bindRange(input, label, paramName) {
-    input.addEventListener("input", () => {
-      if (!selectedTrack) return;
-      selectedTrack.compressor[paramName].value = parseFloat(input.value);
-      label.textContent = input.value;
-    });
-  }
-
-  bindRange(thresholdEl, threshVal, "threshold");
-  bindRange(ratioEl, ratioVal, "ratio");
-  bindRange(attackEl, attackVal, "attack");
-  bindRange(releaseEl, releaseVal, "release");
-
-  function refreshCompressorUI() {
-    if (!selectedTrack) return;
-
-    threshVal.textContent = thresholdEl.value = selectedTrack.compressor.threshold.value.toFixed(0);
-    ratioVal.textContent = ratioEl.value = selectedTrack.compressor.ratio.value.toFixed(0);
-    attackVal.textContent = attackEl.value = selectedTrack.compressor.attack.value.toFixed(2);
-    releaseVal.textContent = releaseEl.value = selectedTrack.compressor.release.value.toFixed(2);
-
-    compEnabled.checked = !selectedTrack.compBypassed;
-  }
-
 });
 </script>
 
