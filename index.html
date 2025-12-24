@@ -133,6 +133,21 @@ button:disabled {
 #transport {
   margin-bottom: 10px;
 }
+  #dynamics {
+  margin-top: 12px;
+  width: 100%;
+  font-size: 13px;
+}
+
+.param {
+  margin-top: 6px;
+}
+
+.param label {
+  display: block;
+  opacity: 0.8;
+}
+
 </style>
 </head>
 
@@ -168,6 +183,28 @@ button:disabled {
         <option value="allpass">All Pass</option>
       </select>
     </div>
+    <!-- DYNAMICS (SIMPLE COMPRESSOR) -->
+<div id="dynamics">
+  <h3>Compressor</h3>
+
+  <label>Position:</label>
+  <select id="comp-position">
+    <option value="off">Off</option>
+    <option value="pre">Pre-EQ</option>
+    <option value="post">Post-EQ</option>
+  </select>
+
+  <div class="param">
+    <label>Threshold</label>
+    <input id="comp-threshold" type="range" min="-60" max="0" value="-18">
+  </div>
+
+  <div class="param">
+    <label>Ratio</label>
+    <input id="comp-ratio" type="range" min="1" max="20" step="0.1" value="4">
+  </div>
+</div>
+
   </main>
 
   <!-- FX RACK -->
@@ -228,17 +265,22 @@ document.addEventListener("DOMContentLoaded", () => {
       eqOutput.connect(gainNode);
       gainNode.connect(mixBus);
 
-      tracks.push({
-        name,
-        buffer,
-        source: null,
-        gainNode,
-        eqInput,
-        eqOutput,
-        eqBands: [],
-        muted: false,
-        solo: false
-      });
+     const compressor = audioContext.createDynamicsCompressor();
+
+tracks.push({
+  name,
+  buffer,
+  source: null,
+  gainNode,
+  eqInput,
+  eqOutput,
+  compressor,
+  compPosition: "off",
+  eqBands: [],
+  muted: false,
+  solo: false
+});
+
     }
 
     buildTrackUI();
@@ -264,6 +306,10 @@ document.addEventListener("DOMContentLoaded", () => {
         row.classList.add("active");
         selectedTrack = track;
         setSelectedBand(null);
+        compPos.value = selectedTrack.compPosition;
+        compThresh.value = selectedTrack.compressor.threshold.value;
+        compRatio.value = selectedTrack.compressor.ratio.value;
+
       };
 
       const controls = document.createElement("div");
@@ -386,6 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
       b.node.gain.value = b.gain;
       b.node.Q.value = b.Q;
       b.node.type = b.type;
+      rebuildChain(track);
     });
 
     let last = track.eqInput;
@@ -622,6 +669,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     rebuildEQ(selectedTrack);
   });
+function rebuildChain(track) {
+  try {
+    track.eqInput.disconnect();
+    track.compressor.disconnect();
+  } catch(e) {}
+
+  if (track.compPosition === "pre") {
+    track.eqInput.connect(track.compressor);
+    track.compressor.connect(track.eqOutput);
+  } else if (track.compPosition === "post") {
+    track.eqInput.connect(track.eqOutput);
+    track.eqOutput.connect(track.compressor);
+  } else {
+    track.eqInput.connect(track.eqOutput);
+  }
+
+  track.compressor.connect(track.gainNode);
+}
 
   // Mouse wheel changes Q when hovering over band
   canvas.addEventListener("wheel", e => {
@@ -658,6 +723,25 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   drawEQ();
+const compPos = document.getElementById("comp-position");
+const compThresh = document.getElementById("comp-threshold");
+const compRatio = document.getElementById("comp-ratio");
+
+compPos.onchange = () => {
+  if (!selectedTrack) return;
+  selectedTrack.compPosition = compPos.value;
+  rebuildChain(selectedTrack);
+};
+
+compThresh.oninput = () => {
+  if (!selectedTrack) return;
+  selectedTrack.compressor.threshold.value = compThresh.value;
+};
+
+compRatio.oninput = () => {
+  if (!selectedTrack) return;
+  selectedTrack.compressor.ratio.value = compRatio.value;
+};
 
 });
 </script>
