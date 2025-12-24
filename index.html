@@ -5,6 +5,7 @@
 <title>Audio Training for Dummies</title>
 
 <style>
+/* --- YOUR EXISTING UI — UNCHANGED --- */
 body {
   margin: 0;
   font-family: sans-serif;
@@ -186,11 +187,10 @@ button:disabled {
   <!-- FX RACK -->
   <aside id="fx-rack">
     <h3>FX Rack</h3>
-    <p>(Per-track FX coming next)</p>
+    <p>(Now PER-track 🎉)</p>
 
-    <!-- NEW DYNAMICS PANEL -->
     <div id="dynamics">
-      <h4>Dynamics (Master Bus)</h4>
+      <h4>Dynamics (Selected Track)</h4>
 
       <label>
         <input type="checkbox" id="comp-enabled" checked>
@@ -217,53 +217,11 @@ button:disabled {
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-  /* =======================
-     AUDIO ENGINE
-  ======================= */
-
   const audioContext = new AudioContext();
   const mixBus = audioContext.createGain();
-
-  /* MASTER COMPRESSOR */
-  const compressor = audioContext.createDynamicsCompressor();
-  compressor.threshold.value = -24;
-  compressor.ratio.value = 4;
-  compressor.attack.value = 0.01;
-  compressor.release.value = 0.25;
-
-  mixBus.connect(compressor);
-  compressor.connect(audioContext.destination);
+  mixBus.connect(audioContext.destination);
 
   const compEnabled = document.getElementById("comp-enabled");
-
-  function updateCompressorRouting() {
-    mixBus.disconnect();
-
-    if (compEnabled.checked) {
-      mixBus.connect(compressor);
-      compressor.connect(audioContext.destination);
-    } else {
-      mixBus.connect(audioContext.destination);
-    }
-  }
-
-  compEnabled.addEventListener("change", updateCompressorRouting);
-
-  // UI -> compressor binding
-  function bindRange(id, label, param) {
-    const el = document.getElementById(id);
-    const lab = document.getElementById(label);
-    el.addEventListener("input", () => {
-      param.value = parseFloat(el.value);
-      lab.textContent = el.value;
-    });
-  }
-
-  bindRange("threshold", "threshVal", compressor.threshold);
-  bindRange("ratio", "ratioVal", compressor.ratio);
-  bindRange("attack", "attackVal", compressor.attack);
-  bindRange("release", "releaseVal", compressor.release);
-
 
   const trackNames = [
     "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
@@ -274,9 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const tracks = [];
   let selectedTrack = null;
 
-  /* =======================
-     LOAD TRACKS
-  ======================= */
+  /* ============ LOAD TRACKS ============ */
 
   document.getElementById("load").onclick = loadTracks;
 
@@ -288,35 +244,46 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`audio/${name}.wav`);
       const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-      const gainNode = audioContext.createGain();
       const eqInput = audioContext.createGain();
       const eqOutput = audioContext.createGain();
 
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.25;
+
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 1;
+
+      // routing
       eqInput.connect(eqOutput);
-      eqOutput.connect(gainNode);
+      eqOutput.connect(compressor);
+      compressor.connect(gainNode);
       gainNode.connect(mixBus);
 
       tracks.push({
         name,
         buffer,
         source: null,
-        gainNode,
         eqInput,
         eqOutput,
+        compressor,
+        gainNode,
         eqBands: [],
         muted: false,
-        solo: false
+        solo: false,
+        compBypassed: false
       });
     }
 
     buildTrackUI();
     selectedTrack = tracks[0];
+    refreshCompressorUI();
     setSelectedBand(null);
   }
 
-  /* =======================
-     TRACK UI
-  ======================= */
+  /* ============ TRACK UI ============ */
 
   function buildTrackUI() {
     const list = document.getElementById("track-list");
@@ -331,6 +298,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
         row.classList.add("active");
         selectedTrack = track;
+        refreshCompressorUI();
         setSelectedBand(null);
       };
 
@@ -367,6 +335,8 @@ document.addEventListener("DOMContentLoaded", () => {
       row.appendChild(controls);
       list.appendChild(row);
     });
+
+    document.querySelector(".track")?.classList.add("active");
   }
 
   function updateMuteSolo() {
@@ -380,9 +350,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* =======================
-     PLAYBACK
-  ======================= */
+  /* ============ LOOPING PLAYBACK ============ */
 
   document.getElementById("play").onclick = play;
   document.getElementById("stop").onclick = stop;
@@ -393,6 +361,7 @@ document.addEventListener("DOMContentLoaded", () => {
     tracks.forEach(track => {
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
+      src.loop = true;
       src.connect(track.eqInput);
       src.start();
       track.source = src;
@@ -402,304 +371,62 @@ document.addEventListener("DOMContentLoaded", () => {
   function stop() {
     tracks.forEach(track => {
       if (track.source) {
-        track.source.stop();
+        try { track.source.stop(); } catch(e){}
         track.source = null;
       }
     });
   }
 
-  /* =======================
-     EQ ENGINE
-  ======================= */
+  /* ============ COMPRESSOR UI BINDS PER TRACK ============ */
 
-  const canvas = document.getElementById("eq");
-  const ctx = canvas.getContext("2d");
+  const thresholdEl = document.getElementById("threshold");
+  const ratioEl = document.getElementById("ratio");
+  const attackEl = document.getElementById("attack");
+  const releaseEl = document.getElementById("release");
 
-  const FREQ_MIN = 20;
-  const FREQ_MAX = 20000;
-  const GAIN_MIN = -24;
-  const GAIN_MAX = 24;
+  const threshVal = document.getElementById("threshVal");
+  const ratioVal = document.getElementById("ratioVal");
+  const attackVal = document.getElementById("attackVal");
+  const releaseVal = document.getElementById("releaseVal");
 
-  let draggingBand = null;
-  let selectedBand = null;
-  let lastMousePos = null;
-  let isDragging = false;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  let hoveredBandAtDraw = null;
-
-  function freqToX(freq) {
-    return (Math.log10(freq / FREQ_MIN) / Math.log10(FREQ_MAX / FREQ_MIN)) * canvas.width;
-  }
-
-  function xToFreq(x) {
-    return Math.min(Math.max(
-      FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width),
-      FREQ_MIN), FREQ_MAX);
-  }
-
-  function gainToY(g) {
-    return canvas.height - ((g - GAIN_MIN) / (GAIN_MAX - GAIN_MIN)) * canvas.height;
-  }
-
-  function yToGain(y) {
-    return Math.min(Math.max(
-      GAIN_MIN + (1 - y / canvas.height) * (GAIN_MAX - GAIN_MIN),
-      GAIN_MIN), GAIN_MAX);
-  }
-
-  function rebuildEQ(track) {
-    try { track.eqInput.disconnect(); } catch(e) {}
-    track.eqBands.forEach(b => {
-      try { b.node.disconnect(); } catch(e) {}
-      b.node.frequency.value = b.frequency;
-      b.node.gain.value = b.gain;
-      b.node.Q.value = b.Q;
-      b.node.type = b.type;
-    });
-
-    let last = track.eqInput;
-    track.eqBands.forEach(b => {
-      last.connect(b.node);
-      last = b.node;
-    });
-
-    last.connect(track.eqOutput);
-  }
-
-  function setSelectedBand(band) {
-    selectedBand = band;
-    document.getElementById("delete-band").disabled = !band;
-    updateBandTypeSelect();
-  }
-
-  document.getElementById("add-band").onclick = () => {
+  compEnabled.addEventListener("change", () => {
     if (!selectedTrack) return;
+    selectedTrack.compBypassed = !compEnabled.checked;
+    updateTrackCompressorRouting(selectedTrack);
+  });
 
-    const node = audioContext.createBiquadFilter();
-    node.type = "peaking";
-    node.frequency.value = 1000;
-    node.gain.value = 0;
-    node.Q.value = 1;
-
-    const newBand = { node, frequency: 1000, gain: 0, Q: 1, type: "peaking" };
-
-    selectedTrack.eqBands.push(newBand);
-    setSelectedBand(newBand);
-    rebuildEQ(selectedTrack);
-  };
-
-  document.getElementById("delete-band").onclick = () => {
-    if (!selectedTrack || !selectedBand) return;
-    const idx = selectedTrack.eqBands.indexOf(selectedBand);
-    if (idx !== -1) {
-      selectedBand.node.disconnect();
-      selectedTrack.eqBands.splice(idx, 1);
-      setSelectedBand(null);
-      rebuildEQ(selectedTrack);
-    }
-  };
-
-  const bandTypeSelect = document.getElementById("band-type-select");
-
-  bandTypeSelect.onchange = () => {
-    if (!selectedTrack || !selectedBand) return;
-    selectedBand.type = bandTypeSelect.value;
-    selectedBand.node.type = bandTypeSelect.value;
-    rebuildEQ(selectedTrack);
-  };
-
-  function updateBandTypeSelect() {
-    bandTypeSelect.disabled = !selectedBand;
-    if (selectedBand) bandTypeSelect.value = selectedBand.type;
-  }
-
-  /* =======================
-     DRAWING (with labels!)
-  ======================= */
-
-  function drawGrid() {
-    ctx.strokeStyle = "#333";
-    ctx.fillStyle = "#666";
-    ctx.font = "10px sans-serif";
-
-    [20,50,100,200,500,1000,2000,5000,10000,20000].forEach(f => {
-      const x = freqToX(f);
-      ctx.beginPath();
-      ctx.moveTo(x,0);
-      ctx.lineTo(x,canvas.height);
-      ctx.stroke();
-      ctx.fillText(f >= 1000 ? (f/1000) + "k" : f, x+2, canvas.height-4);
-    });
-
-    for (let db = -24; db <= 24; db += 6) {
-      const y = gainToY(db);
-      ctx.beginPath();
-      ctx.moveTo(0,y);
-      ctx.lineTo(canvas.width,y);
-      ctx.stroke();
-      ctx.fillText(db + " dB", 4, y-2);
-    }
-  }
-
-  function niceFreq(f) {
-    return f >= 1000 ? (f/1000).toFixed(2) + " kHz" : f.toFixed(0) + " Hz";
-  }
-
-  function drawEQ() {
-    requestAnimationFrame(drawEQ);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGrid();
-
-    if (!selectedTrack) return;
-
-    // response curve
-    ctx.strokeStyle = "#0f0";
-    ctx.beginPath();
-
-    for (let x = 0; x < canvas.width; x++) {
-      const freq = xToFreq(x);
-      let mag = 1;
-
-      selectedTrack.eqBands.forEach(b => {
-        const freqArr = new Float32Array([freq]);
-        const magArr = new Float32Array(1);
-        const phaseArr = new Float32Array(1);
-        b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
-        mag *= magArr[0];
-      });
-
-      const db = 20 * Math.log10(mag);
-      const y = gainToY(db);
-      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-
-    // bands
-    let hoveredBand = null;
-
-    selectedTrack.eqBands.forEach(band => {
-      const x = freqToX(band.frequency);
-      const y = gainToY(band.gain);
-
-      ctx.beginPath();
-      ctx.fillStyle = (band === draggingBand) ? "#ff0" :
-                      (band === selectedBand ? "#0ff" : "#0f0");
-      ctx.strokeStyle = "#090";
-      ctx.lineWidth = 2;
-      ctx.arc(x, y, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // LABEL TEXT
-      ctx.fillStyle = "#0f0";
-      ctx.font = "10px sans-serif";
-      ctx.textBaseline = "top";
-
-      ctx.fillText(niceFreq(band.frequency), x + 12, y - 8);
-      ctx.fillText(band.gain.toFixed(1) + " dB", x + 12, y + 4);
-      ctx.fillText("Q: " + band.Q.toFixed(2), x + 12, y + 16);
-
-      if (lastMousePos) {
-        const dx = lastMousePos.x - x;
-        const dy = lastMousePos.y - y;
-        if (dx*dx + dy*dy <= 64) hoveredBand = band;
-      }
-    });
-
-    canvas.classList.toggle("band-hover", hoveredBand && !isDragging);
-    canvas.classList.toggle("band-dragging", isDragging);
-    hoveredBandAtDraw = hoveredBand;
-  }
-
-  /* =======================
-     INTERACTION
-  ======================= */
-
-  function findBandAtPos(x, y) {
-    if (!selectedTrack) return null;
-    return selectedTrack.eqBands.find(b => {
-      const bx = freqToX(b.frequency);
-      const by = gainToY(b.gain);
-      const dx = x - bx;
-      const dy = y - by;
-      return dx*dx + dy*dy <= 64;
-    }) || null;
-  }
-
-  canvas.addEventListener("mousedown", e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
-    const band = findBandAtPos(mx, my);
-    if (band) {
-      draggingBand = band;
-      setSelectedBand(band);
-      isDragging = true;
-      dragOffsetX = mx - freqToX(band.frequency);
-      dragOffsetY = my - gainToY(band.gain);
-      e.preventDefault();
+  function updateTrackCompressorRouting(track) {
+    try { track.eqOutput.disconnect(); } catch(e){}
+    if (track.compBypassed) {
+      track.eqOutput.connect(track.gainNode);
     } else {
-      setSelectedBand(null);
+      track.eqOutput.connect(track.compressor);
     }
-  });
+  }
 
-  canvas.addEventListener("mouseup", () => {
-    isDragging = false;
-    draggingBand = null;
-  });
+  function bindRange(input, label, paramName) {
+    input.addEventListener("input", () => {
+      if (!selectedTrack) return;
+      selectedTrack.compressor[paramName].value = parseFloat(input.value);
+      label.textContent = input.value;
+    });
+  }
 
-  canvas.addEventListener("mouseleave", () => {
-    isDragging = false;
-    draggingBand = null;
-  });
+  bindRange(thresholdEl, threshVal, "threshold");
+  bindRange(ratioEl, ratioVal, "ratio");
+  bindRange(attackEl, attackVal, "attack");
+  bindRange(releaseEl, releaseVal, "release");
 
-  canvas.addEventListener("mousemove", e => {
-    const rect = canvas.getBoundingClientRect();
-    lastMousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  function refreshCompressorUI() {
+    if (!selectedTrack) return;
 
-    if (!isDragging || !draggingBand) return;
+    threshVal.textContent = thresholdEl.value = selectedTrack.compressor.threshold.value.toFixed(0);
+    ratioVal.textContent = ratioEl.value = selectedTrack.compressor.ratio.value.toFixed(0);
+    attackVal.textContent = attackEl.value = selectedTrack.compressor.attack.value.toFixed(2);
+    releaseVal.textContent = releaseEl.value = selectedTrack.compressor.release.value.toFixed(2);
 
-    const mx = e.clientX - rect.left - dragOffsetX;
-    const my = e.clientY - rect.top - dragOffsetY;
-
-    draggingBand.frequency = xToFreq(mx);
-    draggingBand.gain = yToGain(my);
-
-    draggingBand.node.frequency.value = draggingBand.frequency;
-    draggingBand.node.gain.value = draggingBand.gain;
-
-    rebuildEQ(selectedTrack);
-  });
-
-  canvas.addEventListener("wheel", e => {
-    e.preventDefault();
-    if (!hoveredBandAtDraw) return;
-
-    hoveredBandAtDraw.Q += (e.deltaY > 0 ? -0.1 : 0.1);
-    hoveredBandAtDraw.Q = Math.min(Math.max(0.1, hoveredBandAtDraw.Q), 18);
-    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
-    rebuildEQ(selectedTrack);
-  }, { passive: false });
-
-  canvas.addEventListener("contextmenu", e => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const band = findBandAtPos(e.clientX-rect.left, e.clientY-rect.top);
-    if (band && selectedTrack) {
-      const idx = selectedTrack.eqBands.indexOf(band);
-      if (idx !== -1) {
-        band.node.disconnect();
-        selectedTrack.eqBands.splice(idx, 1);
-        if (band === selectedBand) setSelectedBand(null);
-        rebuildEQ(selectedTrack);
-      }
-    }
-  });
-
-  drawEQ();
+    compEnabled.checked = !selectedTrack.compBypassed;
+  }
 
 });
 </script>
