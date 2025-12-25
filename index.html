@@ -223,30 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const audioContext = new AudioContext();
   const mixBus = audioContext.createGain();
 
-  /* MASTER COMPRESSOR */
-  const compressor = audioContext.createDynamicsCompressor();
-  compressor.threshold.value = -24;
-  compressor.ratio.value = 4;
-  compressor.attack.value = 0.01;
-  compressor.release.value = 0.25;
-
-  mixBus.connect(compressor);
-  compressor.connect(audioContext.destination);
-
-  const compEnabled = document.getElementById("comp-enabled");
-
-  function updateCompressorRouting() {
-    mixBus.disconnect();
-
-    if (compEnabled.checked) {
-      mixBus.connect(compressor);
-      compressor.connect(audioContext.destination);
-    } else {
-      mixBus.connect(audioContext.destination);
-    }
-  }
-
-  compEnabled.addEventListener("change", updateCompressorRouting);
 
   // UI -> compressor binding
   function bindRange(id, label, param) {
