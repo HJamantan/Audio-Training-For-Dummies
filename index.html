@@ -208,6 +208,51 @@ button:disabled {
     </div>
   </aside>
 </div>
+    <!-- EQ -->
+  <main id="eq-panel">
+    <canvas id="eq" width="900" height="400"></canvas>
+    <div id="controls">
+      <button id="add-band">Add EQ Band</button>
+      <button id="delete-band" disabled>Delete Selected Band</button>
+    </div>
+    <div id="band-type-container">
+      <label for="band-type-select">Band Type:</label>
+      <select id="band-type-select" disabled>
+        <option value="peaking">Bell (Peaking)</option>
+        <option value="lowshelf">Low Shelf</option>
+        <option value="highshelf">High Shelf</option>
+        <option value="lowpass">Low Pass</option>
+        <option value="highpass">High Pass</option>
+        <option value="notch">Notch</option>
+        <option value="allpass">All Pass</option>
+      </select>
+    </div>
+  </main>
+
+  <!-- FX RACK -->
+  <aside id="fx-rack">
+    <h3>FX Rack</h3>
+
+    <!-- NEW DYNAMICS PANEL -->
+    <div id="dynamics">
+      <h4>Dynamics (Master Bus)</h4>
+
+      <label>Threshold: <span id="threshVal">-24</span> dB</label>
+      <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
+
+      <label>Ratio: <span id="ratioVal">4</span>:1</label>
+      <input id="ratio" type="range" min="1" max="20" step="1" value="4">
+
+      <label>Attack: <span id="attackVal">0.01</span>s</label>
+      <input id="attack" type="range" min="0" max="1" step="0.01" value="0.01">
+
+      <label>Release: <span id="releaseVal">0.25</span>s</label>
+      <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
+    </div>
+
+  </aside>
+
+</div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -401,53 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("stop").onclick = stop;
   document.body.onclick = () => audioContext.resume();
 
-  <!-- EQ -->
-  <main id="eq-panel">
-    <canvas id="eq" width="900" height="400"></canvas>
-    <div id="controls">
-      <button id="add-band">Add EQ Band</button>
-      <button id="delete-band" disabled>Delete Selected Band</button>
-    </div>
-    <div id="band-type-container">
-      <label for="band-type-select">Band Type:</label>
-      <select id="band-type-select" disabled>
-        <option value="peaking">Bell (Peaking)</option>
-        <option value="lowshelf">Low Shelf</option>
-        <option value="highshelf">High Shelf</option>
-        <option value="lowpass">Low Pass</option>
-        <option value="highpass">High Pass</option>
-        <option value="notch">Notch</option>
-        <option value="allpass">All Pass</option>
-      </select>
-    </div>
-  </main>
-
-  <!-- FX RACK -->
-  <aside id="fx-rack">
-    <h3>FX Rack</h3>
-
-    <!-- NEW DYNAMICS PANEL -->
-    <div id="dynamics">
-      <h4>Dynamics (Master Bus)</h4>
-
-      <label>Threshold: <span id="threshVal">-24</span> dB</label>
-      <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
-
-      <label>Ratio: <span id="ratioVal">4</span>:1</label>
-      <input id="ratio" type="range" min="1" max="20" step="1" value="4">
-
-      <label>Attack: <span id="attackVal">0.01</span>s</label>
-      <input id="attack" type="range" min="0" max="1" step="0.01" value="0.01">
-
-      <label>Release: <span id="releaseVal">0.25</span>s</label>
-      <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
-    </div>
-
-  </aside>
-
-</div>
-  
-document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", () => {
 
   /* =======================
      AUDIO ENGINE
