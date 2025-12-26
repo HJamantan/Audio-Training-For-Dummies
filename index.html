@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8" />
 <title>Audio Training for Dummies</title>
-
 <style>
 body {
   margin: 0;
@@ -146,11 +145,12 @@ button:disabled {
 #dynamics input[type="range"] {
   width: 100%;
 }
+  
 </style>
 </head>
-
 <body>
 <div id="app">
+
   <!-- TRACKS -->
   <aside id="tracks">
     <div id="transport">
@@ -187,7 +187,12 @@ button:disabled {
     <h3>FX Rack</h3>
 
     <div id="dynamics">
-      <h4>Dynamics (Master Bus — UI only for now)</h4>
+      <h4>Dynamics (Track-based)</h4>
+
+      <label>
+        <input id="comp-enabled" type="checkbox">
+        Enable Compressor
+      </label>
 
       <label>Threshold: <span id="threshVal">-24</span> dB</label>
       <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
@@ -201,7 +206,6 @@ button:disabled {
       <label>Release: <span id="releaseVal">0.25</span>s</label>
       <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
     </div>
-
   </aside>
 </div>
 
@@ -442,8 +446,7 @@ document.addEventListener("DOMContentLoaded", () => {
   </aside>
 
 </div>
-
-<script>
+  
 document.addEventListener("DOMContentLoaded", () => {
 
   /* =======================
@@ -1081,6 +1084,5 @@ tracks.forEach(track => {
   }
 });
 </script>
-
 </body>
 </html>
