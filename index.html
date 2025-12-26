@@ -151,7 +151,6 @@ button:disabled {
 
 <body>
 <div id="app">
-
   <!-- TRACKS -->
   <aside id="tracks">
     <div id="transport">
@@ -161,6 +160,242 @@ button:disabled {
     </div>
     <div id="track-list"></div>
   </aside>
+
+  <!-- EQ -->
+  <main id="eq-panel">
+    <canvas id="eq" width="900" height="400"></canvas>
+    <div id="controls">
+      <button id="add-band">Add EQ Band</button>
+      <button id="delete-band" disabled>Delete Selected Band</button>
+    </div>
+    <div id="band-type-container">
+      <label for="band-type-select">Band Type:</label>
+      <select id="band-type-select" disabled>
+        <option value="peaking">Bell (Peaking)</option>
+        <option value="lowshelf">Low Shelf</option>
+        <option value="highshelf">High Shelf</option>
+        <option value="lowpass">Low Pass</option>
+        <option value="highpass">High Pass</option>
+        <option value="notch">Notch</option>
+        <option value="allpass">All Pass</option>
+      </select>
+    </div>
+  </main>
+
+  <!-- FX RACK -->
+  <aside id="fx-rack">
+    <h3>FX Rack</h3>
+
+    <div id="dynamics">
+      <h4>Dynamics (Master Bus — UI only for now)</h4>
+
+      <label>Threshold: <span id="threshVal">-24</span> dB</label>
+      <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
+
+      <label>Ratio: <span id="ratioVal">4</span>:1</label>
+      <input id="ratio" type="range" min="1" max="20" step="1" value="4">
+
+      <label>Attack: <span id="attackVal">0.01</span>s</label>
+      <input id="attack" type="range" min="0" max="1" step="0.01" value="0.01">
+
+      <label>Release: <span id="releaseVal">0.25</span>s</label>
+      <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
+    </div>
+
+  </aside>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  const audioContext = new AudioContext();
+  const mixBus = audioContext.createGain();
+  mixBus.connect(audioContext.destination);
+
+  const trackNames = [
+    "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
+    "Bass Guitar","Acoustic Guitar","Keyboard (Nord)",
+    "Electric Guitar","Male Vocal","Female Vocal"
+  ];
+
+  const tracks = [];
+  let selectedTrack = null;
+  let selectedBand = null;
+
+  /* ----------- Dynamics sliders (UI only atm) ----------- */
+
+  const thresholdSlider = document.getElementById("threshold");
+  const ratioSlider = document.getElementById("ratio");
+  const attackSlider = document.getElementById("attack");
+  const releaseSlider = document.getElementById("release");
+
+  function updateDynamicsUI() {
+    if (!selectedTrack) return;
+
+    document.getElementById("threshVal").textContent =
+      thresholdSlider.value;
+
+    document.getElementById("ratioVal").textContent =
+      ratioSlider.value;
+
+    document.getElementById("attackVal").textContent =
+      Number(attackSlider.value).toFixed(2);
+
+    document.getElementById("releaseVal").textContent =
+      Number(releaseSlider.value).toFixed(2);
+  }
+
+  /* ========== TRACK LOADING ========== */
+
+  async function loadTracks() {
+    tracks.length = 0;
+    document.getElementById("track-list").innerHTML = "";
+
+    for (const name of trackNames) {
+
+      const res = await fetch(`audio/${name}.wav`);
+      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+
+      const gainNode = audioContext.createGain();
+      const eqInput = audioContext.createGain();
+      const eqOutput = audioContext.createGain();
+
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+
+      eqOutput.connect(gainNode);
+      gainNode.connect(mixBus);
+
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.25;
+
+      const track = {
+        name,
+        buffer,
+        source: null,
+        gainNode,
+        eqInput,
+        eqOutput,
+        eqBands: [],
+        analyser,
+        compressor,
+        enabledCompressor: false,
+        muted: false,
+        solo: false,
+        grMeter: null
+      };
+
+      tracks.push(track);
+    }
+
+    buildTrackUI();
+    selectedTrack = tracks[0];
+  }
+
+  document.getElementById("load").onclick = loadTracks;
+
+  /* ========== TRACK UI ========== */
+
+  function buildTrackUI() {
+    const list = document.getElementById("track-list");
+    list.innerHTML = "";
+
+    tracks.forEach(track => {
+      const row = document.createElement("div");
+      row.className = "track";
+      row.textContent = track.name;
+
+      row.onclick = () => {
+        document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
+        row.classList.add("active");
+        selectedTrack = track;
+        selectedBand = null;
+        updateDynamicsUI();
+      };
+
+      const controls = document.createElement("div");
+      controls.className = "track-controls";
+
+      const mute = document.createElement("button");
+      mute.textContent = "M";
+      mute.onclick = e => {
+        e.stopPropagation();
+        track.muted = !track.muted;
+        mute.classList.toggle("muted", track.muted);
+        updateMuteSolo();
+      };
+
+      const solo = document.createElement("button");
+      solo.textContent = "S";
+      solo.onclick = e => {
+        e.stopPropagation();
+        track.solo = !track.solo;
+        solo.classList.toggle("soloed", track.solo);
+        updateMuteSolo();
+      };
+
+      const fader = document.createElement("input");
+      fader.type = "range";
+      fader.min = 0;
+      fader.max = 1;
+      fader.step = 0.01;
+      fader.value = 0.75;
+      fader.oninput = () => track.gainNode.gain.value = fader.value;
+
+      const gr = document.createElement("div");
+      gr.style.height = "6px";
+      gr.style.background = "#400";
+      gr.style.width = "0px";
+      track.grMeter = gr;
+
+      controls.append(mute, solo, fader, gr);
+      row.appendChild(controls);
+      list.appendChild(row);
+    });
+  }
+
+  function updateMuteSolo() {
+    const anySolo = tracks.some(t => t.solo);
+    tracks.forEach(t => {
+      t.gainNode.gain.value =
+        anySolo ? (t.solo && !t.muted ? 1 : 0)
+                : (t.muted ? 0 : 1);
+    });
+  }
+
+  /* ========== PLAYBACK (LOOPING) ========== */
+
+  function play() {
+    stop();
+    tracks.forEach(track => {
+      const src = audioContext.createBufferSource();
+      src.buffer = track.buffer;
+      src.loop = true;
+
+      src.connect(track.analyser);
+      track.analyser.connect(track.eqInput);
+      track.eqOutput.connect(track.gainNode);
+
+      src.start();
+      track.source = src;
+    });
+  }
+
+  function stop() {
+    tracks.forEach(track => {
+      if (track.source) {
+        try { track.source.stop(); } catch {}
+        track.source = null;
+      }
+    });
+  }
+
+  document.getElementById("play").onclick = play;
+  document.getElementById("stop").onclick = stop;
+  document.body.onclick = () => audioContext.resume();
 
   <!-- EQ -->
   <main id="eq-panel">
