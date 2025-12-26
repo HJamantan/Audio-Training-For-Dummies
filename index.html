@@ -191,11 +191,6 @@ button:disabled {
     <div id="dynamics">
       <h4>Dynamics (Master Bus)</h4>
 
-      <label>
-        <input type="checkbox" id="comp-enabled" checked>
-        Enable Compressor
-      </label>
-
       <label>Threshold: <span id="threshVal">-24</span> dB</label>
       <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
 
@@ -223,28 +218,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const audioContext = new AudioContext();
   const mixBus = audioContext.createGain();
 
-
-  // UI -> compressor binding
-  function bindRange(id, label, param) {
-    const el = document.getElementById(id);
-    const lab = document.getElementById(label);
-    el.addEventListener("input", () => {
-      param.value = parseFloat(el.value);
-      lab.textContent = el.value;
-    });
-  }
-
-  function updateDynamicsUI() {
-  if (!selectedTrack) return;
-
-  const c = selectedTrack.compressor;
-
-  document.getElementById("threshVal").textContent = c.threshold.value;
-  document.getElementById("ratioVal").textContent = c.ratio.value;
-  document.getElementById("attackVal").textContent = c.attack.value;
-  document.getElementById("releaseVal").textContent = c.release.value;
-}
-
   const trackNames = [
     "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
     "Bass Guitar","Acoustic Guitar","Keyboard (Nord)",
@@ -254,11 +227,83 @@ document.addEventListener("DOMContentLoaded", () => {
   const tracks = [];
   let selectedTrack = null;
 
+  /* Dynamics Panel */
+const compEnabledCheckbox = document.getElementById("comp-enabled");
+const thresholdSlider = document.getElementById("threshold");
+const ratioSlider = document.getElementById("ratio");
+const attackSlider = document.getElementById("attack");
+const releaseSlider = document.getElementById("release");
+
+function updateDynamicsUI() {
+  if (!selectedTrack) {
+    compEnabledCheckbox.checked = false;
+    thresholdSlider.disabled = true;
+    ratioSlider.disabled = true;
+    attackSlider.disabled = true;
+    releaseSlider.disabled = true;
+    return;
+  }
+  compEnabledCheckbox.checked = selectedTrack.enabledCompressor;
+  thresholdSlider.disabled = !selectedTrack.enabledCompressor;
+  ratioSlider.disabled = !selectedTrack.enabledCompressor;
+  attackSlider.disabled = !selectedTrack.enabledCompressor;
+  releaseSlider.disabled = !selectedTrack.enabledCompressor;
+
+  thresholdSlider.value = selectedTrack.compressor.threshold.value.toFixed(1);
+  document.getElementById("threshVal").textContent = selectedTrack.compressor.threshold.value.toFixed(1);
+
+  ratioSlider.value = selectedTrack.compressor.ratio.value.toFixed(1);
+  document.getElementById("ratioVal").textContent = selectedTrack.compressor.ratio.value.toFixed(1);
+
+  attackSlider.value = selectedTrack.compressor.attack.value.toFixed(2);
+  document.getElementById("attackVal").textContent = selectedTrack.compressor.attack.value.toFixed(2);
+
+  releaseSlider.value = selectedTrack.compressor.release.value.toFixed(2);
+  document.getElementById("releaseVal").textContent = selectedTrack.compressor.release.value.toFixed(2);
+
   /* =======================
      LOAD TRACKS
   ======================= */
 
   document.getElementById("load").onclick = loadTracks;
+function rebuildTrackRouting(track) {
+
+  // disconnect everything first
+  try { track.eqInput.disconnect(); } catch {}
+  try { track.analyser.disconnect(); } catch {}
+  try { track.compressor.disconnect(); } catch {}
+  try { track.gainNode.disconnect(); } catch {}
+
+  // configure EQ nodes
+  track.eqBands.forEach(b => {
+    b.node.frequency.value = b.frequency;
+    b.node.gain.value = b.gain;
+    b.node.Q.value = b.Q;
+    b.node.type = b.type;
+  });
+
+  // --- Routing chain ---
+
+  // source → analyser
+  track.analyser.connect(track.eqInput);
+
+  let last = track.eqInput;
+
+  // EQ chain
+  track.eqBands.forEach(b => {
+    last.connect(b.node);
+    last = b.node;
+  });
+
+  if (track.enabledCompressor) {
+    last.connect(track.compressor);
+    track.compressor.connect(track.gainNode);
+  } else {
+    last.connect(track.gainNode);
+  }
+
+  track.gainNode.connect(mixBus);
+}
 
   async function loadTracks() {
     tracks.length = 0;
@@ -274,6 +319,7 @@ const eqOutput = audioContext.createGain();
 
 // EQ internal routing
 eqInput.connect(eqOutput);
+gainNode.connect(mixBus);
 
 const compressor = audioContext.createDynamicsCompressor();
 compressor.threshold.value = -24;
@@ -281,27 +327,61 @@ compressor.ratio.value = 4;
 compressor.attack.value = 0.01;
 compressor.release.value = 0.25;
 
-// ROUTING
-eqOutput.connect(compressor);
-compressor.connect(gainNode);
+const enabledCompressor = true;
 
-gainNode.connect(mixBus);
-
-tracks.push({
+const track = {
   name,
   buffer,
   source: null,
   gainNode,
   eqInput,
   eqOutput,
-  compressor,
-  gainReduction: 0,
   eqBands: [],
   muted: false,
   solo: false,
   analyser: audioContext.createAnalyser(),
-});
+  compressor,
+  enabledCompressor
+};
 
+track.analyser.fftSize = 2048;
+
+tracks.push(track);
+
+rebuildTrackRouting(track);
+
+function rebuildTrackRouting(track) {
+  try { track.eqInput.disconnect(); } catch(e) {}
+  track.eqBands.forEach(b => {
+    try { b.node.disconnect(); } catch(e) {}
+  });
+  try { track.compressor.disconnect(); } catch(e) {}
+
+  // Setup EQ band nodes
+  track.eqBands.forEach(b => {
+    b.node.frequency.value = b.frequency;
+    b.node.gain.value = b.gain;
+    b.node.Q.value = b.Q;
+    b.node.type = b.type;
+  });
+
+  // Connect EQ chain
+  let last = track.eqInput;
+  track.eqBands.forEach(b => {
+    last.connect(b.node);
+    last = b.node;
+  });
+
+  // Connect either to compressor or directly to gainNode
+  if (track.enabledCompressor) {
+    last.connect(track.compressor);
+    track.compressor.connect(track.gainNode);
+  } else {
+    last.connect(track.gainNode);
+  }
+}
+
+      
 const track = tracks[tracks.length - 1];
 track.analyser.fftSize = 2048;
 
@@ -382,11 +462,7 @@ track.grMeter = grMeter;
       } else {
         t.gainNode.gain.value = t.muted ? 0 : 1;
       }
-    });
-    track.compressor.threshold.value = compressor.threshold.value;
-track.compressor.ratio.value = compressor.ratio.value;
-track.compressor.attack.value = compressor.attack.value;
-track.compressor.release.value = compressor.release.value;
+    }
   }
 
   /* =======================
@@ -602,11 +678,8 @@ ctx.stroke();
         const phaseArr = new Float32Array(1);
         b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
         mag *= magArr[0];
-        
-        tracks.forEach(track => {
-  const gr = track.compressor.reduction;
-  track.gainReduction = gr;
-});
+      }
+                                    
 
 tracks.forEach(track => {
   const gr = Math.abs(track.gainReduction); // positive number
