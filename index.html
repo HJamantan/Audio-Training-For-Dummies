@@ -4,148 +4,147 @@
 <meta charset="UTF-8" />
 <title>Audio Training for Dummies</title>
 <style>
-body {
-  margin: 0;
-  font-family: sans-serif;
-  background: #111;
-  color: #ddd;
-}
+  body {
+    margin: 0;
+    font-family: sans-serif;
+    background: #111;
+    color: #ddd;
+  }
 
-#app {
-  display: grid;
-  grid-template-columns: 260px 1fr 260px;
-  height: 100vh;
-}
+  #app {
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    height: 100vh;
+  }
 
-/* TRACK LIST */
-#tracks {
-  background: #1a1a1a;
-  padding: 10px;
-  overflow-y: auto;
-}
+  /* TRACK LIST */
+  #tracks {
+    background: #1a1a1a;
+    padding: 10px;
+    overflow-y: auto;
+  }
 
-.track {
-  padding: 6px;
-  border-bottom: 1px solid #333;
-  cursor: pointer;
-}
+  .track {
+    padding: 6px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+  }
 
-.track.active {
-  background: #2a2a2a;
-}
+  .track.active {
+    background: #2a2a2a;
+  }
 
-.track-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-}
+  .track-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
 
-.track-controls button {
-  font-size: 10px;
-  width: 22px;
-  height: 22px;
-  background: #333;
-  color: #ddd;
-  border: none;
-  cursor: pointer;
-}
+  .track-controls button {
+    font-size: 10px;
+    width: 22px;
+    height: 22px;
+    background: #333;
+    color: #ddd;
+    border: none;
+    cursor: pointer;
+  }
 
-.track-controls button.muted {
-  background: #b00000;
-}
+  .track-controls button.muted {
+    background: #b00000;
+  }
 
-.track-controls button.soloed {
-  background: #b0b000;
-  color: #000;
-}
+  .track-controls button.soloed {
+    background: #b0b000;
+    color: #000;
+  }
 
-.track-controls input[type="range"] {
-  flex: 1;
-}
+  .track-controls input[type="range"] {
+    flex: 1;
+  }
 
-/* EQ PANEL */
-#eq-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px;
-}
+  /* EQ PANEL */
+  #eq-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+  }
 
-canvas {
-  background: #000;
-  border: 1px solid #333;
-  cursor: crosshair;
-}
+  canvas {
+    background: #000;
+    border: 1px solid #333;
+    cursor: crosshair;
+  }
 
-canvas.band-hover {
-  cursor: grab;
-}
+  canvas.band-hover {
+    cursor: grab;
+  }
 
-canvas.band-dragging {
-  cursor: grabbing;
-}
+  canvas.band-dragging {
+    cursor: grabbing;
+  }
 
-#controls {
-  margin-top: 10px;
-  display: flex;
-  gap: 10px;
-}
+  #controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+  }
 
-button {
-  background: #333;
-  color: #ddd;
-  border: none;
-  padding: 8px 12px;
-  font-size: 16px;
-  cursor: pointer;
-}
+  button {
+    background: #333;
+    color: #ddd;
+    border: none;
+    padding: 8px 12px;
+    font-size: 16px;
+    cursor: pointer;
+  }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 
-/* Band type selector container */
-#band-type-container {
-  margin-top: 10px;
-  color: #ddd;
-  font-size: 14px;
-}
+  /* Band type selector container */
+  #band-type-container {
+    margin-top: 10px;
+    color: #ddd;
+    font-size: 14px;
+  }
 
-#band-type-select {
-  background: #222;
-  color: #ddd;
-  border: 1px solid #444;
-  padding: 4px 6px;
-  font-size: 14px;
-  margin-left: 6px;
-  cursor: pointer;
-}
+  #band-type-select {
+    background: #222;
+    color: #ddd;
+    border: 1px solid #444;
+    padding: 4px 6px;
+    font-size: 14px;
+    margin-left: 6px;
+    cursor: pointer;
+  }
 
-/* FX RACK */
-#fx-rack {
-  background: #1a1a1a;
-  padding: 10px;
-  overflow-y: auto;
-}
+  /* FX RACK */
+  #fx-rack {
+    background: #1a1a1a;
+    padding: 10px;
+    overflow-y: auto;
+  }
 
-#transport {
-  margin-bottom: 10px;
-}
+  #transport {
+    margin-bottom: 10px;
+  }
 
-/* Dynamics Panel */
-#dynamics {
-  margin-top: 20px;
-  border-top: 1px solid #333;
-  padding-top: 10px;
-  font-size: 13px;
-}
+  /* Dynamics Panel */
+  #dynamics {
+    margin-top: 20px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+    font-size: 13px;
+  }
 
-#dynamics input[type="range"] {
-  width: 100%;
-}
-  
+  #dynamics input[type="range"] {
+    width: 100%;
+  }
 </style>
 </head>
 <body>
@@ -155,8 +154,8 @@ button:disabled {
   <aside id="tracks">
     <div id="transport">
       <button id="load">Load Tracks</button>
-      <button id="play">Play</button>
-      <button id="stop">Stop</button>
+      <button id="play" disabled>Play</button>
+      <button id="stop" disabled>Stop</button>
     </div>
     <div id="track-list"></div>
   </aside>
@@ -165,54 +164,7 @@ button:disabled {
   <main id="eq-panel">
     <canvas id="eq" width="900" height="400"></canvas>
     <div id="controls">
-      <button id="add-band">Add EQ Band</button>
-      <button id="delete-band" disabled>Delete Selected Band</button>
-    </div>
-    <div id="band-type-container">
-      <label for="band-type-select">Band Type:</label>
-      <select id="band-type-select" disabled>
-        <option value="peaking">Bell (Peaking)</option>
-        <option value="lowshelf">Low Shelf</option>
-        <option value="highshelf">High Shelf</option>
-        <option value="lowpass">Low Pass</option>
-        <option value="highpass">High Pass</option>
-        <option value="notch">Notch</option>
-        <option value="allpass">All Pass</option>
-      </select>
-    </div>
-  </main>
-
-  <!-- FX RACK -->
-  <aside id="fx-rack">
-    <h3>FX Rack</h3>
-
-    <div id="dynamics">
-      <h4>Dynamics (Track-based)</h4>
-
-      <label>
-        <input id="comp-enabled" type="checkbox">
-        Enable Compressor
-      </label>
-
-      <label>Threshold: <span id="threshVal">-24</span> dB</label>
-      <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
-
-      <label>Ratio: <span id="ratioVal">4</span>:1</label>
-      <input id="ratio" type="range" min="1" max="20" step="1" value="4">
-
-      <label>Attack: <span id="attackVal">0.01</span>s</label>
-      <input id="attack" type="range" min="0" max="1" step="0.01" value="0.01">
-
-      <label>Release: <span id="releaseVal">0.25</span>s</label>
-      <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
-    </div>
-  </aside>
-</div>
-    <!-- EQ -->
-  <main id="eq-panel">
-    <canvas id="eq" width="900" height="400"></canvas>
-    <div id="controls">
-      <button id="add-band">Add EQ Band</button>
+      <button id="add-band" disabled>Add EQ Band</button>
       <button id="delete-band" disabled>Delete Selected Band</button>
     </div>
     <div id="band-type-container">
@@ -256,10 +208,40 @@ button:disabled {
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-
   const audioContext = new AudioContext();
+
+  // Master mix bus and compressor
   const mixBus = audioContext.createGain();
-  mixBus.connect(audioContext.destination);
+  const masterCompressor = audioContext.createDynamicsCompressor();
+
+  // Connect master compressor to destination
+  mixBus.connect(masterCompressor);
+  masterCompressor.connect(audioContext.destination);
+
+  // Dynamics controls linked to master compressor
+  const thresholdSlider = document.getElementById("threshold");
+  const ratioSlider = document.getElementById("ratio");
+  const attackSlider = document.getElementById("attack");
+  const releaseSlider = document.getElementById("release");
+
+  function updateMasterDynamics() {
+    masterCompressor.threshold.value = Number(thresholdSlider.value);
+    masterCompressor.ratio.value = Number(ratioSlider.value);
+    masterCompressor.attack.value = Number(attackSlider.value);
+    masterCompressor.release.value = Number(releaseSlider.value);
+
+    document.getElementById("threshVal").textContent = thresholdSlider.value;
+    document.getElementById("ratioVal").textContent = ratioSlider.value;
+    document.getElementById("attackVal").textContent = Number(attackSlider.value).toFixed(2);
+    document.getElementById("releaseVal").textContent = Number(releaseSlider.value).toFixed(2);
+  }
+
+  thresholdSlider.addEventListener("input", updateMasterDynamics);
+  ratioSlider.addEventListener("input", updateMasterDynamics);
+  attackSlider.addEventListener("input", updateMasterDynamics);
+  releaseSlider.addEventListener("input", updateMasterDynamics);
+
+  updateMasterDynamics();
 
   const trackNames = [
     "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
@@ -271,358 +253,89 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedTrack = null;
   let selectedBand = null;
 
-  /* ----------- Dynamics sliders (UI only atm) ----------- */
+  const playButton = document.getElementById("play");
+  const stopButton = document.getElementById("stop");
+  const addBandButton = document.getElementById("add-band");
+  const deleteBandButton = document.getElementById("delete-band");
+  const bandTypeSelect = document.getElementById("band-type-select");
 
-  const thresholdSlider = document.getElementById("threshold");
-  const ratioSlider = document.getElementById("ratio");
-  const attackSlider = document.getElementById("attack");
-  const releaseSlider = document.getElementById("release");
-
-  function updateDynamicsUI() {
-    if (!selectedTrack) return;
-
-    document.getElementById("threshVal").textContent =
-      thresholdSlider.value;
-
-    document.getElementById("ratioVal").textContent =
-      ratioSlider.value;
-
-    document.getElementById("attackVal").textContent =
-      Number(attackSlider.value).toFixed(2);
-
-    document.getElementById("releaseVal").textContent =
-      Number(releaseSlider.value).toFixed(2);
-  }
-
-  /* ========== TRACK LOADING ========== */
+  /* =======================
+     TRACK LOADING
+  ======================= */
 
   async function loadTracks() {
     tracks.length = 0;
     document.getElementById("track-list").innerHTML = "";
+    playButton.disabled = true;
+    stopButton.disabled = true;
+    addBandButton.disabled = true;
+    deleteBandButton.disabled = true;
+    bandTypeSelect.disabled = true;
 
     for (const name of trackNames) {
+      try {
+        const res = await fetch(`audio/${name}.wav`);
+        if (!res.ok) throw new Error(`Failed to load ${name}`);
+        const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-      const res = await fetch(`audio/${name}.wav`);
-      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+        const gainNode = audioContext.createGain();
+        const eqInput = audioContext.createGain();
+        const eqOutput = audioContext.createGain();
 
-      const gainNode = audioContext.createGain();
-      const eqInput = audioContext.createGain();
-      const eqOutput = audioContext.createGain();
+        // Connect EQ input to output by default (no bands yet)
+        eqInput.connect(eqOutput);
 
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 2048;
+        gainNode.connect(mixBus);
 
-      eqOutput.connect(gainNode);
-      gainNode.connect(mixBus);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
 
-      const compressor = audioContext.createDynamicsCompressor();
-      compressor.threshold.value = -24;
-      compressor.ratio.value = 4;
-      compressor.attack.value = 0.01;
-      compressor.release.value = 0.25;
+        // Each track's eqOutput connects to gainNode
+        eqOutput.connect(gainNode);
 
-      const track = {
-        name,
-        buffer,
-        source: null,
-        gainNode,
-        eqInput,
-        eqOutput,
-        eqBands: [],
-        analyser,
-        compressor,
-        enabledCompressor: false,
-        muted: false,
-        solo: false,
-        grMeter: null
-      };
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.ratio.value = 4;
+        compressor.attack.value = 0.01;
+        compressor.release.value = 0.25;
 
-      tracks.push(track);
-    }
+        const track = {
+          name,
+          buffer,
+          source: null,
+          gainNode,
+          eqInput,
+          eqOutput,
+          eqBands: [],
+          muted: false,
+          solo: false,
+          analyser,
+          compressor,
+          enabledCompressor: false,
+          grMeter: null
+        };
 
-    buildTrackUI();
-    selectedTrack = tracks[0];
-  }
-
-  document.getElementById("load").onclick = loadTracks;
-
-  /* ========== TRACK UI ========== */
-
-  function buildTrackUI() {
-    const list = document.getElementById("track-list");
-    list.innerHTML = "";
-
-    tracks.forEach(track => {
-      const row = document.createElement("div");
-      row.className = "track";
-      row.textContent = track.name;
-
-      row.onclick = () => {
-        document.querySelectorAll(".track").forEach(t => t.classList.remove("active"));
-        row.classList.add("active");
-        selectedTrack = track;
-        selectedBand = null;
-        updateDynamicsUI();
-      };
-
-      const controls = document.createElement("div");
-      controls.className = "track-controls";
-
-      const mute = document.createElement("button");
-      mute.textContent = "M";
-      mute.onclick = e => {
-        e.stopPropagation();
-        track.muted = !track.muted;
-        mute.classList.toggle("muted", track.muted);
-        updateMuteSolo();
-      };
-
-      const solo = document.createElement("button");
-      solo.textContent = "S";
-      solo.onclick = e => {
-        e.stopPropagation();
-        track.solo = !track.solo;
-        solo.classList.toggle("soloed", track.solo);
-        updateMuteSolo();
-      };
-
-      const fader = document.createElement("input");
-      fader.type = "range";
-      fader.min = 0;
-      fader.max = 1;
-      fader.step = 0.01;
-      fader.value = 0.75;
-      fader.oninput = () => track.gainNode.gain.value = fader.value;
-
-      const gr = document.createElement("div");
-      gr.style.height = "6px";
-      gr.style.background = "#400";
-      gr.style.width = "0px";
-      track.grMeter = gr;
-
-      controls.append(mute, solo, fader, gr);
-      row.appendChild(controls);
-      list.appendChild(row);
-    });
-  }
-
-  function updateMuteSolo() {
-    const anySolo = tracks.some(t => t.solo);
-    tracks.forEach(t => {
-      t.gainNode.gain.value =
-        anySolo ? (t.solo && !t.muted ? 1 : 0)
-                : (t.muted ? 0 : 1);
-    });
-  }
-
-  /* ========== PLAYBACK (LOOPING) ========== */
-
-  function play() {
-    stop();
-    tracks.forEach(track => {
-      const src = audioContext.createBufferSource();
-      src.buffer = track.buffer;
-      src.loop = true;
-
-      src.connect(track.analyser);
-      track.analyser.connect(track.eqInput);
-      track.eqOutput.connect(track.gainNode);
-
-      src.start();
-      track.source = src;
-    });
-  }
-
-  function stop() {
-    tracks.forEach(track => {
-      if (track.source) {
-        try { track.source.stop(); } catch {}
-        track.source = null;
+        tracks.push(track);
+      } catch (err) {
+        console.error(err);
+        alert(`Error loading track "${name}": ${err.message}`);
       }
-    });
-  }
-
-  document.getElementById("play").onclick = play;
-  document.getElementById("stop").onclick = stop;
-  document.body.onclick = () => audioContext.resume();
-
-  /* =======================
-     AUDIO ENGINE
-  ======================= */
-
-  const trackNames = [
-    "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
-    "Bass Guitar","Acoustic Guitar","Keyboard (Nord)",
-    "Electric Guitar","Male Vocal","Female Vocal"
-  ];
-
-  const tracks = [];
-  let selectedTrack = null;
-
-  /* Dynamics Panel */
-const compEnabledCheckbox = document.getElementById("comp-enabled");
-const thresholdSlider = document.getElementById("threshold");
-const ratioSlider = document.getElementById("ratio");
-const attackSlider = document.getElementById("attack");
-const releaseSlider = document.getElementById("release");
-
-function updateDynamicsUI() {
-  if (!selectedTrack) {
-    compEnabledCheckbox.checked = false;
-    thresholdSlider.disabled = true;
-    ratioSlider.disabled = true;
-    attackSlider.disabled = true;
-    releaseSlider.disabled = true;
-    return;
-  }
-  compEnabledCheckbox.checked = selectedTrack.enabledCompressor;
-  thresholdSlider.disabled = !selectedTrack.enabledCompressor;
-  ratioSlider.disabled = !selectedTrack.enabledCompressor;
-  attackSlider.disabled = !selectedTrack.enabledCompressor;
-  releaseSlider.disabled = !selectedTrack.enabledCompressor;
-
-  thresholdSlider.value = selectedTrack.compressor.threshold.value.toFixed(1);
-  document.getElementById("threshVal").textContent = selectedTrack.compressor.threshold.value.toFixed(1);
-
-  ratioSlider.value = selectedTrack.compressor.ratio.value.toFixed(1);
-  document.getElementById("ratioVal").textContent = selectedTrack.compressor.ratio.value.toFixed(1);
-
-  attackSlider.value = selectedTrack.compressor.attack.value.toFixed(2);
-  document.getElementById("attackVal").textContent = selectedTrack.compressor.attack.value.toFixed(2);
-
-  releaseSlider.value = selectedTrack.compressor.release.value.toFixed(2);
-  document.getElementById("releaseVal").textContent = selectedTrack.compressor.release.value.toFixed(2);
-
-  /* =======================
-     LOAD TRACKS
-  ======================= */
-
-  document.getElementById("load").onclick = loadTracks;
-function rebuildTrackRouting(track) {
-
-  // disconnect everything first
-  try { track.eqInput.disconnect(); } catch {}
-  try { track.analyser.disconnect(); } catch {}
-  try { track.compressor.disconnect(); } catch {}
-  try { track.gainNode.disconnect(); } catch {}
-
-  // configure EQ nodes
-  track.eqBands.forEach(b => {
-    b.node.frequency.value = b.frequency;
-    b.node.gain.value = b.gain;
-    b.node.Q.value = b.Q;
-    b.node.type = b.type;
-  });
-
-  // --- Routing chain ---
-
-  // source → analyser
-  track.analyser.connect(track.eqInput);
-
-  let last = track.eqInput;
-
-  // EQ chain
-  track.eqBands.forEach(b => {
-    last.connect(b.node);
-    last = b.node;
-  });
-
-  if (track.enabledCompressor) {
-    last.connect(track.compressor);
-    track.compressor.connect(track.gainNode);
-  } else {
-    last.connect(track.gainNode);
-  }
-
-  track.gainNode.connect(mixBus);
-}
-
-  async function loadTracks() {
-    tracks.length = 0;
-    document.getElementById("track-list").innerHTML = "";
-
-    for (const name of trackNames) {
-      const res = await fetch(`audio/${name}.wav`);
-      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
-
-      const gainNode = audioContext.createGain();
-const eqInput = audioContext.createGain();
-const eqOutput = audioContext.createGain();
-
-// EQ internal routing
-eqInput.connect(eqOutput);
-gainNode.connect(mixBus);
-
-const compressor = audioContext.createDynamicsCompressor();
-compressor.threshold.value = -24;
-compressor.ratio.value = 4;
-compressor.attack.value = 0.01;
-compressor.release.value = 0.25;
-
-const enabledCompressor = true;
-
-const track = {
-  name,
-  buffer,
-  source: null,
-  gainNode,
-  eqInput,
-  eqOutput,
-  eqBands: [],
-  muted: false,
-  solo: false,
-  analyser: audioContext.createAnalyser(),
-  compressor,
-  enabledCompressor
-};
-
-track.analyser.fftSize = 2048;
-
-tracks.push(track);
-
-rebuildTrackRouting(track);
-
-function rebuildTrackRouting(track) {
-  try { track.eqInput.disconnect(); } catch(e) {}
-  track.eqBands.forEach(b => {
-    try { b.node.disconnect(); } catch(e) {}
-  });
-  try { track.compressor.disconnect(); } catch(e) {}
-
-  // Setup EQ band nodes
-  track.eqBands.forEach(b => {
-    b.node.frequency.value = b.frequency;
-    b.node.gain.value = b.gain;
-    b.node.Q.value = b.Q;
-    b.node.type = b.type;
-  });
-
-  // Connect EQ chain
-  let last = track.eqInput;
-  track.eqBands.forEach(b => {
-    last.connect(b.node);
-    last = b.node;
-  });
-
-  // Connect either to compressor or directly to gainNode
-  if (track.enabledCompressor) {
-    last.connect(track.compressor);
-    track.compressor.connect(track.gainNode);
-  } else {
-    last.connect(track.gainNode);
-  }
-}
-
-      
-const track = tracks[tracks.length - 1];
-track.analyser.fftSize = 2048;
-
     }
 
     buildTrackUI();
-    selectedTrack = tracks[0];
-    setSelectedBand(null);
+
+    if (tracks.length > 0) {
+      selectedTrack = tracks[0];
+      setSelectedBand(null);
+      addBandButton.disabled = false;
+      playButton.disabled = false;
+      stopButton.disabled = false;
+    }
   }
+
+  document.getElementById("load").onclick = () => {
+    audioContext.resume().then(loadTracks);
+  };
 
   /* =======================
      TRACK UI
@@ -643,6 +356,7 @@ track.analyser.fftSize = 2048;
         selectedTrack = track;
         setSelectedBand(null);
         updateDynamicsUI();
+        addBandButton.disabled = false;
       };
 
       const controls = document.createElement("div");
@@ -650,6 +364,7 @@ track.analyser.fftSize = 2048;
 
       const mute = document.createElement("button");
       mute.textContent = "M";
+      mute.title = "Mute";
       mute.onclick = e => {
         e.stopPropagation();
         track.muted = !track.muted;
@@ -659,6 +374,7 @@ track.analyser.fftSize = 2048;
 
       const solo = document.createElement("button");
       solo.textContent = "S";
+      solo.title = "Solo";
       solo.onclick = e => {
         e.stopPropagation();
         track.solo = !track.solo;
@@ -672,14 +388,18 @@ track.analyser.fftSize = 2048;
       fader.max = 1;
       fader.step = 0.01;
       fader.value = 0.75;
-      fader.oninput = () => track.gainNode.gain.value = fader.value;
+      fader.title = "Volume";
+      fader.oninput = () => {
+        track.gainNode.gain.value = fader.value;
+      };
+      track.gainNode.gain.value = fader.value;
 
       const grMeter = document.createElement("div");
-grMeter.style.height = "6px";
-grMeter.style.background = "#400";
-grMeter.style.width = "0px";
+      grMeter.style.height = "6px";
+      grMeter.style.background = "#400";
+      grMeter.style.width = "0px";
+      track.grMeter = grMeter;
 
-track.grMeter = grMeter;
       controls.append(mute, solo, fader, grMeter);
       row.appendChild(controls);
       list.appendChild(row);
@@ -690,44 +410,102 @@ track.grMeter = grMeter;
     const anySolo = tracks.some(t => t.solo);
     tracks.forEach(t => {
       if (anySolo) {
-        t.gainNode.gain.value = t.solo && !t.muted ? 1 : 0;
+        t.gainNode.gain.value = (t.solo && !t.muted) ? 1 : 0;
       } else {
         t.gainNode.gain.value = t.muted ? 0 : 1;
       }
-    }
+    });
   }
 
   /* =======================
-     PLAYBACK
+     PLAYBACK (LOOPING)
   ======================= */
-
-  document.getElementById("play").onclick = play;
-  document.getElementById("stop").onclick = stop;
-  document.body.onclick = () => audioContext.resume();
 
   function play() {
     stop();
     tracks.forEach(track => {
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
+      src.loop = true;
+
+      // Connect source chain: source → analyser → eqInput → (EQ bands) → eqOutput → gainNode → mixBus
       src.connect(track.analyser);
       track.analyser.connect(track.eqInput);
+
+      rebuildTrackRouting(track);
+
       src.start();
       track.source = src;
     });
+
+    playButton.disabled = true;
+    stopButton.disabled = false;
   }
 
   function stop() {
     tracks.forEach(track => {
       if (track.source) {
-        track.source.stop();
+        try { track.source.stop(); } catch(e) {}
         track.source = null;
       }
     });
+
+    playButton.disabled = false;
+    stopButton.disabled = true;
+  }
+
+  document.getElementById("play").onclick = () => {
+    audioContext.resume().then(play);
+  };
+  document.getElementById("stop").onclick = stop;
+
+  document.body.onclick = () => audioContext.resume();
+
+  /* =======================
+     TRACK ROUTING
+  ======================= */
+
+  function rebuildTrackRouting(track) {
+    try { track.eqInput.disconnect(); } catch(e) {}
+    track.eqBands.forEach(b => {
+      try { b.node.disconnect(); } catch(e) {}
+      // Update node params
+      b.node.frequency.value = b.frequency;
+      b.node.gain.value = b.gain;
+      b.node.Q.value = b.Q;
+      b.node.type = b.type;
+    });
+
+    let last = track.eqInput;
+
+    track.eqBands.forEach(b => {
+      last.connect(b.node);
+      last = b.node;
+    });
+
+    // Connect to compressor if enabled, else directly to gainNode
+    try { track.compressor.disconnect(); } catch(e) {}
+
+    if (track.enabledCompressor) {
+      last.connect(track.compressor);
+      track.compressor.connect(track.gainNode);
+    } else {
+      last.connect(track.gainNode);
+    }
   }
 
   /* =======================
-     EQ ENGINE
+     DYNAMICS UI (TRACK SELECTED)
+  ======================= */
+
+  function updateDynamicsUI() {
+    if (!selectedTrack) return;
+
+    // Currently only UI sync with sliders - you could extend to per-track compressor later
+  }
+
+  /* =======================
+     EQ ENGINE & CANVAS
   ======================= */
 
   const canvas = document.getElementById("eq");
@@ -739,7 +517,6 @@ track.grMeter = grMeter;
   const GAIN_MAX = 24;
 
   let draggingBand = null;
-  let selectedBand = null;
   let lastMousePos = null;
   let isDragging = false;
   let dragOffsetX = 0;
@@ -766,57 +543,26 @@ track.grMeter = grMeter;
       GAIN_MIN), GAIN_MAX);
   }
 
-  function rebuildEQ(track) {
-    try { track.eqInput.disconnect(); } catch(e) {}
-    track.eqBands.forEach(b => {
-      try { b.node.disconnect(); } catch(e) {}
-      b.node.frequency.value = b.frequency;
-      b.node.gain.value = b.gain;
-      b.node.Q.value = b.Q;
-      b.node.type = b.type;
-    });
-
-    let last = track.eqInput;
-    track.eqBands.forEach(b => {
-      last.connect(b.node);
-      last = b.node;
-    });
-
-    last.connect(track.eqOutput);
-  }
-
   function setSelectedBand(band) {
     selectedBand = band;
-    document.getElementById("delete-band").disabled = !band;
+    deleteBandButton.disabled = !band;
     updateBandTypeSelect();
+  }
+
+  bandTypeSelect.onchange = () => {
+    if (!selectedTrack || !selectedBand) return;
+    selectedBand.type = bandTypeSelect.value;
+    selectedBand.node.type = bandTypeSelect.value;
+    rebuildTrackRouting(selectedTrack);
+  };
+
+  function updateBandTypeSelect() {
+    bandTypeSelect.disabled = !selectedBand;
+    if (selectedBand) bandTypeSelect.value = selectedBand.type;
   }
 
   document.getElementById("add-band").onclick = () => {
     if (!selectedTrack) return;
-    // ===== LIVE SPECTRUM DISPLAY =====
-const analyser = selectedTrack.analyser;
-const data = new Uint8Array(analyser.frequencyBinCount);
-analyser.getByteFrequencyData(data);
-
-ctx.strokeStyle = "#08f";
-ctx.beginPath();
-
-for (let i = 0; i < data.length; i++) {
-  const freq = i * audioContext.sampleRate / (2 * data.length);
-  const x = freqToX(freq);
-
-  // Convert magnitude (0–255) roughly to dB scale
-  const norm = data[i] / 255;
-  const db = GAIN_MIN + norm * (GAIN_MAX - GAIN_MIN);
-
-  const y = gainToY(db);
-
-  if (i === 0) ctx.moveTo(x, y);
-  else ctx.lineTo(x, y);
-}
-
-ctx.stroke();
-// ===== END SPECTRUM =====
 
     const node = audioContext.createBiquadFilter();
     node.type = "peaking";
@@ -828,7 +574,7 @@ ctx.stroke();
 
     selectedTrack.eqBands.push(newBand);
     setSelectedBand(newBand);
-    rebuildEQ(selectedTrack);
+    rebuildTrackRouting(selectedTrack);
   };
 
   document.getElementById("delete-band").onclick = () => {
@@ -838,27 +584,13 @@ ctx.stroke();
       selectedBand.node.disconnect();
       selectedTrack.eqBands.splice(idx, 1);
       setSelectedBand(null);
-      rebuildEQ(selectedTrack);
+      rebuildTrackRouting(selectedTrack);
     }
   };
 
-  const bandTypeSelect = document.getElementById("band-type-select");
-
-  bandTypeSelect.onchange = () => {
-    if (!selectedTrack || !selectedBand) return;
-    selectedBand.type = bandTypeSelect.value;
-    selectedBand.node.type = bandTypeSelect.value;
-    rebuildEQ(selectedTrack);
-  };
-
-  function updateBandTypeSelect() {
-    bandTypeSelect.disabled = !selectedBand;
-    if (selectedBand) bandTypeSelect.value = selectedBand.type;
-  }
-
-  /* =======
+  /* =======================
      DRAWING
-  ======= */
+  ======================= */
 
   function drawGrid() {
     ctx.strokeStyle = "#333";
@@ -871,37 +603,30 @@ ctx.stroke();
       ctx.moveTo(x,0);
       ctx.lineTo(x,canvas.height);
       ctx.stroke();
-      ctx.fillText(f >= 1000 ? (f/1000) + "k" : f, x+2, canvas.height-4);
+      ctx.fillText(f + " Hz", x + 2, canvas.height - 4);
     });
 
-    for (let db = -24; db <= 24; db += 6) {
-      const y = gainToY(db);
+    // Gain lines
+    for (let g = GAIN_MIN; g <= GAIN_MAX; g += 6) {
+      const y = gainToY(g);
       ctx.beginPath();
       ctx.moveTo(0,y);
       ctx.lineTo(canvas.width,y);
       ctx.stroke();
-      ctx.fillText(db + " dB", 4, y-2);
+      ctx.fillText(g + " dB", 4, y - 2);
     }
   }
 
-  function niceFreq(f) {
-    return f >= 1000 ? (f/1000).toFixed(2) + " kHz" : f.toFixed(0) + " Hz";
-  }
-
-  function drawEQ() {
-    requestAnimationFrame(drawEQ);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawGrid();
-
+  function drawCurve() {
     if (!selectedTrack) return;
 
-    // response curve
+    ctx.lineWidth = 3;
     ctx.strokeStyle = "#0f0";
     ctx.beginPath();
 
-    for (let x = 0; x < canvas.width; x++) {
-      const freq = xToFreq(x);
+    const points = 200;
+    for (let i = 0; i <= points; i++) {
+      const freq = xToFreq(i * canvas.width / points);
       let mag = 1;
 
       selectedTrack.eqBands.forEach(b => {
@@ -910,172 +635,125 @@ ctx.stroke();
         const phaseArr = new Float32Array(1);
         b.node.getFrequencyResponse(freqArr, magArr, phaseArr);
         mag *= magArr[0];
-      }
-                                    
-
-tracks.forEach(track => {
-  const gr = Math.abs(track.gainReduction); // positive number
-  const pct = Math.min(gr / 20, 1);         // scale 0–20dB
-  track.grMeter.style.width = (pct * 100) + "%";
-});
       });
 
-      const db = 20 * Math.log10(mag);
-      const y = gainToY(db);
-      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
-    }
-    ctx.stroke();
+      const gainDB = 20 * Math.log10(mag);
+      const y = gainToY(gainDB);
 
-    // bands
-    let hoveredBand = null;
+      if (i === 0) ctx.moveTo(i * canvas.width / points, y);
+      else ctx.lineTo(i * canvas.width / points, y);
+    }
+
+    ctx.stroke();
+  }
+
+  function drawBands() {
+    if (!selectedTrack) return;
+
+    hoveredBandAtDraw = null;
 
     selectedTrack.eqBands.forEach(band => {
       const x = freqToX(band.frequency);
       const y = gainToY(band.gain);
 
       ctx.beginPath();
-      ctx.fillStyle = (band === draggingBand) ? "#ff0" :
-                      (band === selectedBand ? "#0ff" : "#0f0");
-      ctx.strokeStyle = "#090";
-      ctx.lineWidth = 2;
       ctx.arc(x, y, 8, 0, Math.PI * 2);
+
+      if (band === selectedBand) {
+        ctx.fillStyle = "#ff0";
+        ctx.strokeStyle = "#ffa500";
+        ctx.lineWidth = 3;
+      } else {
+        ctx.fillStyle = "#0f0";
+        ctx.strokeStyle = "#080";
+        ctx.lineWidth = 1;
+      }
+
       ctx.fill();
       ctx.stroke();
 
-      // LABEL TEXT
-      ctx.fillStyle = "#0f0";
-      ctx.font = "10px sans-serif";
-      ctx.textBaseline = "top";
-
-      ctx.fillText(niceFreq(band.frequency), x + 12, y - 8);
-      ctx.fillText(band.gain.toFixed(1) + " dB", x + 12, y + 4);
-      ctx.fillText("Q: " + band.Q.toFixed(2), x + 12, y + 16);
-
+      // Check if mouse near this band for hover (used in mouse move)
       if (lastMousePos) {
         const dx = lastMousePos.x - x;
         const dy = lastMousePos.y - y;
-        if (dx*dx + dy*dy <= 64) hoveredBand = band;
+        if (Math.sqrt(dx*dx + dy*dy) < 10) {
+          hoveredBandAtDraw = band;
+          if (!isDragging) canvas.style.cursor = "grab";
+        }
       }
     });
 
-    canvas.classList.toggle("band-hover", hoveredBand && !isDragging);
-    canvas.classList.toggle("band-dragging", isDragging);
-    hoveredBandAtDraw = hoveredBand;
+    if (!hoveredBandAtDraw && !isDragging) {
+      canvas.style.cursor = "crosshair";
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawGrid();
+    drawCurve();
+    drawBands();
+
+    requestAnimationFrame(draw);
   }
 
   /* =======================
-     INTERACTION
+     MOUSE EVENTS
   ======================= */
 
-  function findBandAtPos(x, y) {
-    if (!selectedTrack) return null;
-    return selectedTrack.eqBands.find(b => {
-      const bx = freqToX(b.frequency);
-      const by = gainToY(b.gain);
-      const dx = x - bx;
-      const dy = y - by;
-      return dx*dx + dy*dy <= 64;
-    }) || null;
-  }
+  canvas.addEventListener("mousemove", e => {
+    lastMousePos = { x: e.offsetX, y: e.offsetY };
+
+    if (isDragging && draggingBand && selectedTrack) {
+      // Calculate new freq and gain from mouse position, limit frequency range and gain range
+      let newFreq = xToFreq(e.offsetX - dragOffsetX);
+      newFreq = Math.min(Math.max(newFreq, FREQ_MIN), FREQ_MAX);
+      let newGain = yToGain(e.offsetY - dragOffsetY);
+      newGain = Math.min(Math.max(newGain, GAIN_MIN), GAIN_MAX);
+
+      draggingBand.frequency = newFreq;
+      draggingBand.gain = newGain;
+
+      // Update node values
+      draggingBand.node.frequency.value = newFreq;
+      draggingBand.node.gain.value = newGain;
+
+      rebuildTrackRouting(selectedTrack);
+    } else {
+      // Change cursor if hovering over a band (done in drawBands)
+    }
+  });
 
   canvas.addEventListener("mousedown", e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
-    const band = findBandAtPos(mx, my);
-    if (band) {
-      draggingBand = band;
-      setSelectedBand(band);
+    if (hoveredBandAtDraw && selectedTrack) {
+      draggingBand = hoveredBandAtDraw;
       isDragging = true;
-      dragOffsetX = mx - freqToX(band.frequency);
-      dragOffsetY = my - gainToY(band.gain);
-      e.preventDefault();
-    } else {
-      setSelectedBand(null);
+      dragOffsetX = e.offsetX - freqToX(draggingBand.frequency);
+      dragOffsetY = e.offsetY - gainToY(draggingBand.gain);
+      setSelectedBand(draggingBand);
+      canvas.style.cursor = "grabbing";
     }
   });
 
-  canvas.addEventListener("mouseup", () => {
+  canvas.addEventListener("mouseup", e => {
     isDragging = false;
     draggingBand = null;
+    canvas.style.cursor = "crosshair";
   });
 
-  canvas.addEventListener("mouseleave", () => {
+  canvas.addEventListener("mouseleave", e => {
     isDragging = false;
     draggingBand = null;
+    canvas.style.cursor = "crosshair";
   });
 
-  canvas.addEventListener("mousemove", e => {
-    const rect = canvas.getBoundingClientRect();
-    lastMousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  /* =======================
+     INITIALIZATION
+  ======================= */
 
-    if (!isDragging || !draggingBand) return;
+  draw();
 
-    const mx = e.clientX - rect.left - dragOffsetX;
-    const my = e.clientY - rect.top - dragOffsetY;
-
-    draggingBand.frequency = xToFreq(mx);
-    draggingBand.gain = yToGain(my);
-
-    draggingBand.node.frequency.value = draggingBand.frequency;
-    draggingBand.node.gain.value = draggingBand.gain;
-
-    rebuildEQ(selectedTrack);
-  });
-
-  canvas.addEventListener("wheel", e => {
-    e.preventDefault();
-    if (!hoveredBandAtDraw) return;
-
-    hoveredBandAtDraw.Q += (e.deltaY > 0 ? -0.1 : 0.1);
-    hoveredBandAtDraw.Q = Math.min(Math.max(0.1, hoveredBandAtDraw.Q), 18);
-    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
-    rebuildEQ(selectedTrack);
-  }, { passive: false });
-
-  canvas.addEventListener("contextmenu", e => {
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const band = findBandAtPos(e.clientX-rect.left, e.clientY-rect.top);
-    if (band && selectedTrack) {
-      const idx = selectedTrack.eqBands.indexOf(band);
-      if (idx !== -1) {
-        band.node.disconnect();
-        selectedTrack.eqBands.splice(idx, 1);
-        if (band === selectedBand) setSelectedBand(null);
-        rebuildEQ(selectedTrack);
-      }
-    }
-  });
-
-  drawEQ();
-/* ============ LOOPING PLAYBACK ============ */
-
-  document.getElementById("play").onclick = play;
-  document.getElementById("stop").onclick = stop;
-  document.body.onclick = () => audioContext.resume();
-
-  function play() {
-    stop();
-    tracks.forEach(track => {
-      const src = audioContext.createBufferSource();
-      src.buffer = track.buffer;
-      src.loop = true;
-      src.connect(track.eqInput);
-      src.start();
-      track.source = src;
-    });
-  }
-
-  function stop() {
-    tracks.forEach(track => {
-      if (track.source) {
-        try { track.source.stop(); } catch(e){}
-        track.source = null;
-      }
-    });
-  }
 });
 </script>
 </body>
