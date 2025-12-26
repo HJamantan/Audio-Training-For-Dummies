@@ -160,8 +160,8 @@
     <div id="track-list"></div>
   </aside>
 
-  <!-- EQ -->
-  <main id="eq-panel">
+  <!--  -->
+  <main id="-panel">
     <canvas id="eq" width="900" height="400"></canvas>
     <div id="controls">
       <button id="add-band" disabled>Add EQ Band</button>
@@ -282,7 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const eqInput = audioContext.createGain();
         const eqOutput = audioContext.createGain();
 
-        // Connect EQ input to output by default (no bands yet)
+        // Connect EQ input to output by default
         eqInput.connect(eqOutput);
 
         gainNode.connect(mixBus);
@@ -427,8 +427,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
       src.loop = true;
-
-      // Connect source chain: source → analyser → eqInput → (EQ bands) → eqOutput → gainNode → mixBus
+      
       src.connect(track.analyser);
       track.analyser.connect(track.eqInput);
 
@@ -517,6 +516,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const GAIN_MAX = 24;
 
   let draggingBand = null;
+  let selectedBand = null;
   let lastMousePos = null;
   let isDragging = false;
   let dragOffsetX = 0;
@@ -528,9 +528,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function xToFreq(x) {
-    return Math.min(Math.max(
-      FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width),
-      FREQ_MIN), FREQ_MAX);
+    const f = FREQ_MIN * Math.pow(FREQ_MAX / FREQ_MIN, x / canvas.width);
+    return Math.min(Math.max(f, FREQ_MIN), FREQ_MAX);
   }
 
   function gainToY(g) {
@@ -538,27 +537,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function yToGain(y) {
-    return Math.min(Math.max(
-      GAIN_MIN + (1 - y / canvas.height) * (GAIN_MAX - GAIN_MIN),
-      GAIN_MIN), GAIN_MAX);
+    const g = GAIN_MIN + (1 - y / canvas.height) * (GAIN_MAX - GAIN_MIN);
+    return Math.min(Math.max(g, GAIN_MIN), GAIN_MAX);
+  }
+
+  function rebuildEQ(track) {
+    try { track.eqInput.disconnect(); } catch(e) {}
+    track.eqBands.forEach(b => {
+      try { b.node.disconnect(); } catch(e) {}
+      b.node.frequency.value = b.frequency;
+      b.node.gain.value = b.gain;
+      b.node.Q.value = b.Q;
+      b.node.type = b.type;
+    });
+
+    let last = track.eqInput;
+    track.eqBands.forEach(b => {
+      last.connect(b.node);
+      last = b.node;
+    });
+
+    last.connect(track.eqOutput);
   }
 
   function setSelectedBand(band) {
     selectedBand = band;
-    deleteBandButton.disabled = !band;
+    updateDeleteButton();
     updateBandTypeSelect();
-  }
-
-  bandTypeSelect.onchange = () => {
-    if (!selectedTrack || !selectedBand) return;
-    selectedBand.type = bandTypeSelect.value;
-    selectedBand.node.type = bandTypeSelect.value;
-    rebuildTrackRouting(selectedTrack);
-  };
-
-  function updateBandTypeSelect() {
-    bandTypeSelect.disabled = !selectedBand;
-    if (selectedBand) bandTypeSelect.value = selectedBand.type;
   }
 
   document.getElementById("add-band").onclick = () => {
@@ -570,11 +575,17 @@ document.addEventListener("DOMContentLoaded", () => {
     node.gain.value = 0;
     node.Q.value = 1;
 
-    const newBand = { node, frequency: 1000, gain: 0, Q: 1, type: "peaking" };
+    const newBand = {
+      node,
+      frequency: 1000,
+      gain: 0,
+      Q: 1,
+      type: "peaking"
+    };
 
     selectedTrack.eqBands.push(newBand);
     setSelectedBand(newBand);
-    rebuildTrackRouting(selectedTrack);
+    rebuildEQ(selectedTrack);
   };
 
   document.getElementById("delete-band").onclick = () => {
@@ -584,12 +595,35 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedBand.node.disconnect();
       selectedTrack.eqBands.splice(idx, 1);
       setSelectedBand(null);
-      rebuildTrackRouting(selectedTrack);
+      rebuildEQ(selectedTrack);
     }
   };
 
+  function updateDeleteButton() {
+    const btn = document.getElementById("delete-band");
+    btn.disabled = !selectedBand;
+  }
+
+  const bandTypeSelect = document.getElementById("band-type-select");
+
+  bandTypeSelect.onchange = () => {
+    if (!selectedTrack || !selectedBand) return;
+    selectedBand.type = bandTypeSelect.value;
+    selectedBand.node.type = bandTypeSelect.value;
+    rebuildEQ(selectedTrack);
+  };
+
+  function updateBandTypeSelect() {
+    if (selectedBand) {
+      bandTypeSelect.disabled = false;
+      bandTypeSelect.value = selectedBand.type;
+    } else {
+      bandTypeSelect.disabled = true;
+    }
+  }
+
   /* =======================
-     DRAWING
+     DRAWING & INTERACTIVITY
   ======================= */
 
   function drawGrid() {
@@ -603,30 +637,33 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.moveTo(x,0);
       ctx.lineTo(x,canvas.height);
       ctx.stroke();
-      ctx.fillText(f + " Hz", x + 2, canvas.height - 4);
+      ctx.fillText(f >= 1000 ? (f/1000) + "k" : f, x+2, canvas.height-4);
     });
 
-    // Gain lines
-    for (let g = GAIN_MIN; g <= GAIN_MAX; g += 6) {
-      const y = gainToY(g);
+    for (let db = -24; db <= 24; db += 6) {
+      const y = gainToY(db);
       ctx.beginPath();
       ctx.moveTo(0,y);
       ctx.lineTo(canvas.width,y);
       ctx.stroke();
-      ctx.fillText(g + " dB", 4, y - 2);
+      ctx.fillText(db + " dB", 4, y-2);
     }
   }
 
-  function drawCurve() {
+  function drawEQ() {
+    requestAnimationFrame(drawEQ);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+
     if (!selectedTrack) return;
 
-    ctx.lineWidth = 3;
+    // Draw frequency response curve of selected track only
     ctx.strokeStyle = "#0f0";
     ctx.beginPath();
 
-    const points = 200;
-    for (let i = 0; i <= points; i++) {
-      const freq = xToFreq(i * canvas.width / points);
+    for (let x = 0; x < canvas.width; x++) {
+      const freq = xToFreq(x);
       let mag = 1;
 
       selectedTrack.eqBands.forEach(b => {
@@ -637,122 +674,153 @@ document.addEventListener("DOMContentLoaded", () => {
         mag *= magArr[0];
       });
 
-      const gainDB = 20 * Math.log10(mag);
-      const y = gainToY(gainDB);
-
-      if (i === 0) ctx.moveTo(i * canvas.width / points, y);
-      else ctx.lineTo(i * canvas.width / points, y);
+      const db = 20 * Math.log10(mag);
+      const y = gainToY(db);
+      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
     }
-
     ctx.stroke();
-  }
 
-  function drawBands() {
-    if (!selectedTrack) return;
-
-    hoveredBandAtDraw = null;
-
+    // Draw EQ bands as draggable circles
+    let hoveredBand = null;
     selectedTrack.eqBands.forEach(band => {
       const x = freqToX(band.frequency);
       const y = gainToY(band.gain);
 
       ctx.beginPath();
+      ctx.fillStyle = (band === draggingBand) ? "#ff0" : (band === selectedBand ? "#0ff" : "#0f0");
+      ctx.strokeStyle = "#090";
+      ctx.lineWidth = 2;
       ctx.arc(x, y, 8, 0, Math.PI * 2);
-
-      if (band === selectedBand) {
-        ctx.fillStyle = "#ff0";
-        ctx.strokeStyle = "#ffa500";
-        ctx.lineWidth = 3;
-      } else {
-        ctx.fillStyle = "#0f0";
-        ctx.strokeStyle = "#080";
-        ctx.lineWidth = 1;
-      }
-
       ctx.fill();
       ctx.stroke();
 
-      // Check if mouse near this band for hover (used in mouse move)
+      // Draw Q value as small text near band
+      ctx.fillStyle = "#0f0";
+      ctx.font = "10px sans-serif";
+      ctx.fillText("Q:" + band.Q.toFixed(2), x + 12, y - 12);
+
+      // Check if mouse is near band to change cursor (for UX)
       if (lastMousePos) {
         const dx = lastMousePos.x - x;
         const dy = lastMousePos.y - y;
-        if (Math.sqrt(dx*dx + dy*dy) < 10) {
-          hoveredBandAtDraw = band;
-          if (!isDragging) canvas.style.cursor = "grab";
+        if (dx * dx + dy * dy <= 64) { // 8*8 radius squared
+          hoveredBand = band;
         }
       }
     });
 
-    if (!hoveredBandAtDraw && !isDragging) {
-      canvas.style.cursor = "crosshair";
-    }
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawGrid();
-    drawCurve();
-    drawBands();
-
-    requestAnimationFrame(draw);
+    canvas.classList.toggle("band-hover", hoveredBand !== null && !isDragging);
+    canvas.classList.toggle("band-dragging", isDragging);
+    hoveredBandAtDraw = hoveredBand; // save for wheel event
   }
 
   /* =======================
-     MOUSE EVENTS
+     INTERACTION
   ======================= */
 
-  canvas.addEventListener("mousemove", e => {
-    lastMousePos = { x: e.offsetX, y: e.offsetY };
-
-    if (isDragging && draggingBand && selectedTrack) {
-      // Calculate new freq and gain from mouse position, limit frequency range and gain range
-      let newFreq = xToFreq(e.offsetX - dragOffsetX);
-      newFreq = Math.min(Math.max(newFreq, FREQ_MIN), FREQ_MAX);
-      let newGain = yToGain(e.offsetY - dragOffsetY);
-      newGain = Math.min(Math.max(newGain, GAIN_MIN), GAIN_MAX);
-
-      draggingBand.frequency = newFreq;
-      draggingBand.gain = newGain;
-
-      // Update node values
-      draggingBand.node.frequency.value = newFreq;
-      draggingBand.node.gain.value = newGain;
-
-      rebuildTrackRouting(selectedTrack);
-    } else {
-      // Change cursor if hovering over a band (done in drawBands)
-    }
-  });
+  function findBandAtPos(x, y) {
+    if (!selectedTrack) return null;
+    return selectedTrack.eqBands.find(b => {
+      const bx = freqToX(b.frequency);
+      const by = gainToY(b.gain);
+      const dx = x - bx;
+      const dy = y - by;
+      return dx * dx + dy * dy <= 64;
+    }) || null;
+  }
 
   canvas.addEventListener("mousedown", e => {
-    if (hoveredBandAtDraw && selectedTrack) {
-      draggingBand = hoveredBandAtDraw;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const band = findBandAtPos(mx, my);
+    if (band) {
+      draggingBand = band;
+      setSelectedBand(band);
       isDragging = true;
-      dragOffsetX = e.offsetX - freqToX(draggingBand.frequency);
-      dragOffsetY = e.offsetY - gainToY(draggingBand.gain);
-      setSelectedBand(draggingBand);
-      canvas.style.cursor = "grabbing";
+      dragOffsetX = mx - freqToX(band.frequency);
+      dragOffsetY = my - gainToY(band.gain);
+      e.preventDefault();
+    } else {
+      setSelectedBand(null);
     }
   });
 
   canvas.addEventListener("mouseup", e => {
-    isDragging = false;
-    draggingBand = null;
-    canvas.style.cursor = "crosshair";
+    if (isDragging) {
+      isDragging = false;
+      draggingBand = null;
+      e.preventDefault();
+    }
   });
 
   canvas.addEventListener("mouseleave", e => {
-    isDragging = false;
-    draggingBand = null;
-    canvas.style.cursor = "crosshair";
+    if (isDragging) {
+      isDragging = false;
+      draggingBand = null;
+    }
   });
 
-  /* =======================
-     INITIALIZATION
-  ======================= */
+  canvas.addEventListener("mousemove", e => {
+    lastMousePos = (() => {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    })();
 
-  draw();
+    if (!isDragging || !draggingBand) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left - dragOffsetX;
+    const my = e.clientY - rect.top - dragOffsetY;
+
+    draggingBand.frequency = xToFreq(mx);
+    draggingBand.gain = yToGain(my);
+
+    draggingBand.node.frequency.value = draggingBand.frequency;
+    draggingBand.node.gain.value = draggingBand.gain;
+
+    rebuildEQ(selectedTrack);
+  });
+
+  // Mouse wheel changes Q when hovering over band
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    if (!hoveredBandAtDraw) return;
+
+    const delta = e.deltaY || e.detail || e.wheelDelta;
+    const step = 0.1;
+    hoveredBandAtDraw.Q += (delta > 0 ? -step : step);
+
+    // Clamp Q between 0.1 and 18 (typical practical range)
+    hoveredBandAtDraw.Q = Math.min(Math.max(hoveredBandAtDraw.Q, 0.1), 18);
+
+    hoveredBandAtDraw.node.Q.value = hoveredBandAtDraw.Q;
+    rebuildEQ(selectedTrack);
+  }, { passive: false });
+
+  // Right click deletes band
+  canvas.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const band = findBandAtPos(mx, my);
+    if (band && selectedTrack) {
+      const idx = selectedTrack.eqBands.indexOf(band);
+      if (idx !== -1) {
+        band.node.disconnect();
+        selectedTrack.eqBands.splice(idx, 1);
+        if (band === selectedBand) setSelectedBand(null);
+        rebuildEQ(selectedTrack);
+      }
+    }
+  });
+
+  drawEQ();
 
 });
 </script>
