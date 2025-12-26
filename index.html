@@ -3,150 +3,139 @@
 <head>
 <meta charset="UTF-8" />
 <title>Audio Training for Dummies</title>
+
 <style>
-  body {
-    margin: 0;
-    font-family: sans-serif;
-    background: #111;
-    color: #ddd;
-  }
+body {
+  margin: 0;
+  font-family: sans-serif;
+  background: #111;
+  color: #ddd;
+}
 
-  #app {
-    display: grid;
-    grid-template-columns: 260px 1fr 260px;
-    height: 100vh;
-  }
+#app {
+  display: grid;
+  grid-template-columns: 260px 1fr 260px;
+  height: 100vh;
+}
 
-  /* TRACK LIST */
-  #tracks {
-    background: #1a1a1a;
-    padding: 10px;
-    overflow-y: auto;
-  }
+/* TRACK LIST */
+#tracks {
+  background: #1a1a1a;
+  padding: 10px;
+  overflow-y: auto;
+}
 
-  .track {
-    padding: 6px;
-    border-bottom: 1px solid #333;
-    cursor: pointer;
-  }
+.track {
+  padding: 6px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+}
 
-  .track.active {
-    background: #2a2a2a;
-  }
+.track.active {
+  background: #2a2a2a;
+}
 
-  .track-controls {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 4px;
-  }
+.track-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
 
-  .track-controls button {
-    font-size: 10px;
-    width: 22px;
-    height: 22px;
-    background: #333;
-    color: #ddd;
-    border: none;
-    cursor: pointer;
-  }
+.track-controls button {
+  font-size: 10px;
+  width: 22px;
+  height: 22px;
+  background: #333;
+  color: #ddd;
+  border: none;
+  cursor: pointer;
+}
 
-  .track-controls button.muted {
-    background: #b00000;
-  }
+.track-controls button.muted {
+  background: #b00000;
+}
 
-  .track-controls button.soloed {
-    background: #b0b000;
-    color: #000;
-  }
+.track-controls button.soloed {
+  background: #b0b000;
+  color: #000;
+}
 
-  .track-controls input[type="range"] {
-    flex: 1;
-  }
+.track-controls input[type="range"] {
+  flex: 1;
+}
 
-  /* EQ PANEL */
-  #eq-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px;
-  }
+/* EQ PANEL */
+#eq-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+}
 
-  canvas {
-    background: #000;
-    border: 1px solid #333;
-    cursor: crosshair;
-  }
+canvas {
+  background: #000;
+  border: 1px solid #333;
+  cursor: crosshair;
+}
 
-  canvas.band-hover {
-    cursor: grab;
-  }
+canvas.band-hover {
+  cursor: grab;
+}
 
-  canvas.band-dragging {
-    cursor: grabbing;
-  }
+canvas.band-dragging {
+  cursor: grabbing;
+}
 
-  #controls {
-    margin-top: 10px;
-    display: flex;
-    gap: 10px;
-  }
+#controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
 
-  button {
-    background: #333;
-    color: #ddd;
-    border: none;
-    padding: 8px 12px;
-    font-size: 16px;
-    cursor: pointer;
-  }
+button {
+  background: #333;
+  color: #ddd;
+  border: none;
+  padding: 8px 12px;
+  font-size: 16px;
+  cursor: pointer;
+}
 
-  button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
-  /* Band type selector container */
-  #band-type-container {
-    margin-top: 10px;
-    color: #ddd;
-    font-size: 14px;
-  }
+/* Band type selector container */
+#band-type-container {
+  margin-top: 10px;
+  color: #ddd;
+  font-size: 14px;
+}
 
-  #band-type-select {
-    background: #222;
-    color: #ddd;
-    border: 1px solid #444;
-    padding: 4px 6px;
-    font-size: 14px;
-    margin-left: 6px;
-    cursor: pointer;
-  }
+#band-type-select {
+  background: #222;
+  color: #ddd;
+  border: 1px solid #444;
+  padding: 4px 6px;
+  font-size: 14px;
+  margin-left: 6px;
+  cursor: pointer;
+}
 
-  /* FX RACK */
-  #fx-rack {
-    background: #1a1a1a;
-    padding: 10px;
-    overflow-y: auto;
-  }
+/* FX RACK */
+#fx-rack {
+  background: #1a1a1a;
+  padding: 10px;
+}
 
-  #transport {
-    margin-bottom: 10px;
-  }
-
-  /* Dynamics Panel */
-  #dynamics {
-    margin-top: 20px;
-    border-top: 1px solid #333;
-    padding-top: 10px;
-    font-size: 13px;
-  }
-
-  #dynamics input[type="range"] {
-    width: 100%;
-  }
+#transport {
+  margin-bottom: 10px;
+}
 </style>
 </head>
+
 <body>
 <div id="app">
 
@@ -154,17 +143,17 @@
   <aside id="tracks">
     <div id="transport">
       <button id="load">Load Tracks</button>
-      <button id="play" disabled>Play</button>
-      <button id="stop" disabled>Stop</button>
+      <button id="play">Play</button>
+      <button id="stop">Stop</button>
     </div>
     <div id="track-list"></div>
   </aside>
 
-  <!--  -->
-  <main id="-panel">
+  <!-- EQ -->
+  <main id="eq-panel">
     <canvas id="eq" width="900" height="400"></canvas>
     <div id="controls">
-      <button id="add-band" disabled>Add EQ Band</button>
+      <button id="add-band">Add EQ Band</button>
       <button id="delete-band" disabled>Delete Selected Band</button>
     </div>
     <div id="band-type-container">
@@ -184,158 +173,78 @@
   <!-- FX RACK -->
   <aside id="fx-rack">
     <h3>FX Rack</h3>
-
-    <!-- NEW DYNAMICS PANEL -->
-    <div id="dynamics">
-      <h4>Dynamics (Master Bus)</h4>
-
-      <label>Threshold: <span id="threshVal">-24</span> dB</label>
-      <input id="threshold" type="range" min="-100" max="0" step="1" value="-24">
-
-      <label>Ratio: <span id="ratioVal">4</span>:1</label>
-      <input id="ratio" type="range" min="1" max="20" step="1" value="4">
-
-      <label>Attack: <span id="attackVal">0.01</span>s</label>
-      <input id="attack" type="range" min="0" max="1" step="0.01" value="0.01">
-
-      <label>Release: <span id="releaseVal">0.25</span>s</label>
-      <input id="release" type="range" min="0" max="1" step="0.01" value="0.25">
-    </div>
-
+    <p>(Per-track FX coming next)</p>
   </aside>
 
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+
+  /* =======================
+     AUDIO ENGINE
+  ======================= */
+
   const audioContext = new AudioContext();
-
-  // Master mix bus and compressor
   const mixBus = audioContext.createGain();
-  const masterCompressor = audioContext.createDynamicsCompressor();
-
-  // Connect master compressor to destination
-  mixBus.connect(masterCompressor);
-  masterCompressor.connect(audioContext.destination);
-
-  // Dynamics controls linked to master compressor
-  const thresholdSlider = document.getElementById("threshold");
-  const ratioSlider = document.getElementById("ratio");
-  const attackSlider = document.getElementById("attack");
-  const releaseSlider = document.getElementById("release");
-
-  function updateMasterDynamics() {
-    masterCompressor.threshold.value = Number(thresholdSlider.value);
-    masterCompressor.ratio.value = Number(ratioSlider.value);
-    masterCompressor.attack.value = Number(attackSlider.value);
-    masterCompressor.release.value = Number(releaseSlider.value);
-
-    document.getElementById("threshVal").textContent = thresholdSlider.value;
-    document.getElementById("ratioVal").textContent = ratioSlider.value;
-    document.getElementById("attackVal").textContent = Number(attackSlider.value).toFixed(2);
-    document.getElementById("releaseVal").textContent = Number(releaseSlider.value).toFixed(2);
-  }
-
-  thresholdSlider.addEventListener("input", updateMasterDynamics);
-  ratioSlider.addEventListener("input", updateMasterDynamics);
-  attackSlider.addEventListener("input", updateMasterDynamics);
-  releaseSlider.addEventListener("input", updateMasterDynamics);
-
-  updateMasterDynamics();
+  mixBus.connect(audioContext.destination);
 
   const trackNames = [
-    "Kick Drum","Snare Drum","Tom 1","Tom 2","Over Head",
-    "Bass Guitar","Acoustic Guitar","Keyboard (Nord)",
-    "Electric Guitar","Male Vocal","Female Vocal"
+    "Kick Drum",
+    "Snare Drum",
+    "Tom 1",
+    "Tom 2",
+    "Over Head",
+    "Bass Guitar",
+    "Acoustic Guitar",
+    "Keyboard (Nord)",
+    "Electric Guitar",
+    "Male Vocal",
+    "Female Vocal"
   ];
 
   const tracks = [];
   let selectedTrack = null;
-  let selectedBand = null;
-
-  const playButton = document.getElementById("play");
-  const stopButton = document.getElementById("stop");
-  const addBandButton = document.getElementById("add-band");
-  const deleteBandButton = document.getElementById("delete-band");
-  const bandTypeSelect = document.getElementById("band-type-select");
 
   /* =======================
-     TRACK LOADING
+     LOAD TRACKS
   ======================= */
+
+  document.getElementById("load").onclick = loadTracks;
 
   async function loadTracks() {
     tracks.length = 0;
     document.getElementById("track-list").innerHTML = "";
-    playButton.disabled = true;
-    stopButton.disabled = true;
-    addBandButton.disabled = true;
-    deleteBandButton.disabled = true;
-    bandTypeSelect.disabled = true;
 
     for (const name of trackNames) {
-      try {
-        const res = await fetch(`audio/${name}.wav`);
-        if (!res.ok) throw new Error(`Failed to load ${name}`);
-        const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
+      const res = await fetch(`audio/${name}.wav`);
+      const buffer = await audioContext.decodeAudioData(await res.arrayBuffer());
 
-        const gainNode = audioContext.createGain();
-        const eqInput = audioContext.createGain();
-        const eqOutput = audioContext.createGain();
+      const gainNode = audioContext.createGain();
+      const eqInput = audioContext.createGain();
+      const eqOutput = audioContext.createGain();
 
-        // Connect EQ input to output by default
-        eqInput.connect(eqOutput);
+      eqInput.connect(eqOutput);
+      eqOutput.connect(gainNode);
+      gainNode.connect(mixBus);
 
-        gainNode.connect(mixBus);
-
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 2048;
-
-        // Each track's eqOutput connects to gainNode
-        eqOutput.connect(gainNode);
-
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.value = -24;
-        compressor.ratio.value = 4;
-        compressor.attack.value = 0.01;
-        compressor.release.value = 0.25;
-
-        const track = {
-          name,
-          buffer,
-          source: null,
-          gainNode,
-          eqInput,
-          eqOutput,
-          eqBands: [],
-          muted: false,
-          solo: false,
-          analyser,
-          compressor,
-          enabledCompressor: false,
-          grMeter: null
-        };
-
-        tracks.push(track);
-      } catch (err) {
-        console.error(err);
-        alert(`Error loading track "${name}": ${err.message}`);
-      }
+      tracks.push({
+        name,
+        buffer,
+        source: null,
+        gainNode,
+        eqInput,
+        eqOutput,
+        eqBands: [],
+        muted: false,
+        solo: false
+      });
     }
 
     buildTrackUI();
-
-    if (tracks.length > 0) {
-      selectedTrack = tracks[0];
-      setSelectedBand(null);
-      addBandButton.disabled = false;
-      playButton.disabled = false;
-      stopButton.disabled = false;
-    }
+    selectedTrack = tracks[0];
+    setSelectedBand(null);
   }
-
-  document.getElementById("load").onclick = () => {
-    audioContext.resume().then(loadTracks);
-  };
 
   /* =======================
      TRACK UI
@@ -355,8 +264,6 @@ document.addEventListener("DOMContentLoaded", () => {
         row.classList.add("active");
         selectedTrack = track;
         setSelectedBand(null);
-        updateDynamicsUI();
-        addBandButton.disabled = false;
       };
 
       const controls = document.createElement("div");
@@ -364,7 +271,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const mute = document.createElement("button");
       mute.textContent = "M";
-      mute.title = "Mute";
       mute.onclick = e => {
         e.stopPropagation();
         track.muted = !track.muted;
@@ -374,7 +280,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const solo = document.createElement("button");
       solo.textContent = "S";
-      solo.title = "Solo";
       solo.onclick = e => {
         e.stopPropagation();
         track.solo = !track.solo;
@@ -388,19 +293,9 @@ document.addEventListener("DOMContentLoaded", () => {
       fader.max = 1;
       fader.step = 0.01;
       fader.value = 0.75;
-      fader.title = "Volume";
-      fader.oninput = () => {
-        track.gainNode.gain.value = fader.value;
-      };
-      track.gainNode.gain.value = fader.value;
+      fader.oninput = () => track.gainNode.gain.value = fader.value;
 
-      const grMeter = document.createElement("div");
-      grMeter.style.height = "6px";
-      grMeter.style.background = "#400";
-      grMeter.style.width = "0px";
-      track.grMeter = grMeter;
-
-      controls.append(mute, solo, fader, grMeter);
+      controls.append(mute, solo, fader);
       row.appendChild(controls);
       list.appendChild(row);
     });
@@ -410,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const anySolo = tracks.some(t => t.solo);
     tracks.forEach(t => {
       if (anySolo) {
-        t.gainNode.gain.value = (t.solo && !t.muted) ? 1 : 0;
+        t.gainNode.gain.value = t.solo && !t.muted ? 1 : 0;
       } else {
         t.gainNode.gain.value = t.muted ? 0 : 1;
       }
@@ -418,93 +313,35 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* =======================
-     PLAYBACK (LOOPING)
+     PLAYBACK
   ======================= */
+
+  document.getElementById("play").onclick = play;
+  document.getElementById("stop").onclick = stop;
+  document.body.onclick = () => audioContext.resume();
 
   function play() {
     stop();
     tracks.forEach(track => {
       const src = audioContext.createBufferSource();
       src.buffer = track.buffer;
-      src.loop = true;
-      
-      src.connect(track.analyser);
-      track.analyser.connect(track.eqInput);
-
-      rebuildTrackRouting(track);
-
+      src.connect(track.eqInput);
       src.start();
       track.source = src;
     });
-
-    playButton.disabled = true;
-    stopButton.disabled = false;
   }
 
   function stop() {
     tracks.forEach(track => {
       if (track.source) {
-        try { track.source.stop(); } catch(e) {}
+        track.source.stop();
         track.source = null;
       }
     });
-
-    playButton.disabled = false;
-    stopButton.disabled = true;
-  }
-
-  document.getElementById("play").onclick = () => {
-    audioContext.resume().then(play);
-  };
-  document.getElementById("stop").onclick = stop;
-
-  document.body.onclick = () => audioContext.resume();
-
-  /* =======================
-     TRACK ROUTING
-  ======================= */
-
-  function rebuildTrackRouting(track) {
-    try { track.eqInput.disconnect(); } catch(e) {}
-    track.eqBands.forEach(b => {
-      try { b.node.disconnect(); } catch(e) {}
-      // Update node params
-      b.node.frequency.value = b.frequency;
-      b.node.gain.value = b.gain;
-      b.node.Q.value = b.Q;
-      b.node.type = b.type;
-    });
-
-    let last = track.eqInput;
-
-    track.eqBands.forEach(b => {
-      last.connect(b.node);
-      last = b.node;
-    });
-
-    // Connect to compressor if enabled, else directly to gainNode
-    try { track.compressor.disconnect(); } catch(e) {}
-
-    if (track.enabledCompressor) {
-      last.connect(track.compressor);
-      track.compressor.connect(track.gainNode);
-    } else {
-      last.connect(track.gainNode);
-    }
   }
 
   /* =======================
-     DYNAMICS UI (TRACK SELECTED)
-  ======================= */
-
-  function updateDynamicsUI() {
-    if (!selectedTrack) return;
-
-    // Currently only UI sync with sliders - you could extend to per-track compressor later
-  }
-
-  /* =======================
-     EQ ENGINE & CANVAS
+     EQ ENGINE & INTERACTION
   ======================= */
 
   const canvas = document.getElementById("eq");
@@ -824,5 +661,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 </script>
+
 </body>
 </html>
